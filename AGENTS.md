@@ -41,7 +41,7 @@ Run the narrowest checks that match the change, and mention anything you could n
 **When introducing new code paths** (new error-handling branches, new conditions, new response codes): add tests for those paths in the same change, before running coverage checks. Coverage checks are a final gate — they should confirm tests pass, not be how you discover that tests are missing.
 
 - Add unit tests (in `internal/<domain>/handler_test.go`) for DB-error paths and other cases that require mocking.
-- Add behavior tests via the `/behavior-test` skill for any new observable API behavior (new query parameters, new success/error responses, new endpoints). Run this skill as part of the same change so both coverage gates pass together.
+- Add or update behavior tests via the `/behavior-test` skill for any new or changed observable API behavior (new query parameters, new success/error responses, new endpoints, or intentional behavior changes). Run this skill as part of the same change so both coverage gates pass together.
 
 ## Behavior Tests
 
@@ -57,7 +57,7 @@ Examples:
 - `TestBehavior_Todo_Create_PersistsAndReturns`
 - `TestBehavior_Todo_Get_Returns404ForUnknownID`
 
-**Rule: do not modify behavior test case files in `cmd/api/behavior/` directly.** This applies to files such as `todo_test.go` and `user_test.go`. This repo expects those tests to be updated through the `/behavior-test` skill so naming and structure stay consistent. If that skill is unavailable in the current runtime, stop and tell the user instead of editing the test case files manually.
+**Rule: behavior test case files in `cmd/api/behavior/` may need to change when observable API behavior changes, but do not modify them directly.** This applies to files such as `todo_test.go` and `user_test.go`. This repo expects those tests to be added or updated through the `/behavior-test` skill so naming and structure stay consistent. If that skill is unavailable in the current runtime, stop and tell the user instead of editing the test case files manually.
 
 Test infrastructure (TestMain, helpers) lives in `cmd/api/behavior/testmain_test.go` and can be modified normally.
 

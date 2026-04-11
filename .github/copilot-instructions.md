@@ -42,6 +42,10 @@ When reviewing a PR:
 
 If behavior tests changed, review the behavior diff before worrying about implementation details.
 
+If a PR adds or changes observable API behavior and there is no corresponding behavior-test addition or update, flag that as likely missing specification coverage.
+
+Infer expected behavior-test coverage from the user-visible surface of the change, not only from the tests already present.
+
 ## Test Trustworthiness
 
 The trust harness only works if the tests are meaningful.
@@ -68,6 +72,7 @@ Inspect implementation details more closely when:
 
 - behavior changed without clear specification
 - tests look weak, incomplete, or gameable
+- expected behavior-test coverage is missing for a user-visible change
 - there are missing negative cases or edge cases
 - the code appears shaped to satisfy fixtures rather than general rules
 - the behavior diff suggests a regression or an unreviewed semantic change
@@ -79,7 +84,7 @@ In those cases, implementation review is a follow-up tool for explaining the ris
 Keep these constraints in mind during review even if other context is noisy:
 
 - follow `AGENTS.md` for repo-specific verification and testing expectations
-- behavior test case files in `cmd/api/behavior/` are governed by the `/behavior-test` workflow rather than direct manual edits
+- behavior test case files in `cmd/api/behavior/` may need to change when observable behavior changes, but those updates should go through the `/behavior-test` workflow rather than direct manual edits
 - new observable API behavior should come with behavior-test coverage, and new internal branches or DB-error paths should come with unit coverage where appropriate
 
 ## Review Output
