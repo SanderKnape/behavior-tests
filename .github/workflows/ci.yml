@@ -39,7 +39,8 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-24.04
     outputs:
-      coverage: ${{ steps.coverage.outputs.pct }}
+      report: ${{ steps.coverage.outputs.report }}
+      pct: ${{ steps.coverage.outputs.pct }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/cache@v5
@@ -52,27 +53,28 @@ jobs:
             ${{ runner.os }}-go-
       - uses: jdx/mise-action@v4
       - run: task test:unit:coverage
-      - name: Extract coverage percentage
+      - name: Generate coverage report
         id: coverage
         if: always()
         run: |
           if [ ! -f unit_coverage.out ]; then
+            echo "report=Coverage data unavailable" >> $GITHUB_OUTPUT
             echo "pct=N/A" >> $GITHUB_OUTPUT
             exit 0
           fi
-          PCT=$(LC_ALL=C awk '
-            /^mode:/ { next }
-            /internal\/platform\// { next }
-            /^me\/internal\// { total += $2; if ($3 > 0) covered += $2 }
-            END { if (total > 0) printf "%.1f", covered * 100 / total; else print "0.0" }
-          ' unit_coverage.out)
-          echo "pct=${PCT}%" >> $GITHUB_OUTPUT
+          REPORT=$(go run ./cmd/coverreport/ -label "unit test" unit_coverage.out 2>&1)
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          PCT=$(echo "$REPORT" | grep "^unit test:" | awk '{print $NF}')
+          echo "pct=$PCT" >> $GITHUB_OUTPUT
 
   test-behavior:
     name: Behavior Tests
     runs-on: ubuntu-24.04
     outputs:
-      coverage: ${{ steps.coverage.outputs.pct }}
+      report: ${{ steps.coverage.outputs.report }}
+      pct: ${{ steps.coverage.outputs.pct }}
       diff: ${{ steps.behavior-diff.outputs.diff }}
     steps:
       - uses: actions/checkout@v6
@@ -88,29 +90,31 @@ jobs:
             ${{ runner.os }}-go-
       - uses: jdx/mise-action@v4
       - run: task test:behavior:coverage
-      - name: Extract coverage percentage
+      - name: Generate coverage report
         id: coverage
         if: always()
         run: |
           if [ ! -f coverage.out ]; then
+            echo "report=Coverage data unavailable" >> $GITHUB_OUTPUT
             echo "pct=N/A" >> $GITHUB_OUTPUT
             exit 0
           fi
-          PCT=$(LC_ALL=C awk '
-            /^mode:/ { next }
-            /internal\/platform\// { next }
-            /^me\/internal\// { total += $2; if ($3 > 0) covered += $2 }
-            END { if (total > 0) printf "%.1f", covered * 100 / total; else print "0.0" }
-          ' coverage.out)
-          echo "pct=${PCT}%" >> $GITHUB_OUTPUT
+          REPORT=$(go run ./cmd/coverreport/ -filter internal/ -exclude internal/platform -label "behavior test" coverage.out 2>&1)
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          PCT=$(echo "$REPORT" | grep "^behavior test:" | awk '{print $NF}')
+          echo "pct=$PCT" >> $GITHUB_OUTPUT
       - name: Generate behavior diff
         id: behavior-diff
         if: always()
         run: |
-          DIFF=$(go run ./cmd/behaviordiff/... ${{ github.event.pull_request.base.sha }})
+          DIFF=$(go run ./cmd/behaviordiff/... ${{ github.event.pull_request.base.sha }} 2>&1)
+          EXIT=$?
           echo "diff<<EOF" >> $GITHUB_OUTPUT
           echo "$DIFF" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          exit $EXIT
 
   comment:
     name: Post PR Comment
@@ -118,6 +122,57 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     steps:
+      - name: Build comment body
+        env:
+          LINT_RESULT: ${{ needs.lint.result }}
+          LINT_DETAILS: ${{ needs.lint.outputs.details }}
+          UNIT_RESULT: ${{ needs.test-unit.result }}
+          UNIT_REPORT: ${{ needs.test-unit.outputs.report }}
+          UNIT_PCT: ${{ needs.test-unit.outputs.pct }}
+          BEHAVIOR_RESULT: ${{ needs.test-behavior.result }}
+          BEHAVIOR_REPORT: ${{ needs.test-behavior.outputs.report }}
+          BEHAVIOR_PCT: ${{ needs.test-behavior.outputs.pct }}
+          BEHAVIOR_DIFF: ${{ needs.test-behavior.outputs.diff }}
+        run: |
+          icon() { [ "$1" = "success" ] && echo "✅" || echo "❌"; }
+
+          {
+            echo "<!-- ci-summary -->"
+            echo "## CI Summary"
+            echo ""
+            echo "| Job | Status |"
+            echo "|-----|--------|"
+            echo "| Lint | $(icon "$LINT_RESULT") |"
+            echo "| Unit Tests | $(icon "$UNIT_RESULT") ${UNIT_PCT:-N/A} |"
+            echo "| Behavior Tests | $(icon "$BEHAVIOR_RESULT") ${BEHAVIOR_PCT:-N/A} |"
+            echo ""
+            echo "## Coverage"
+            echo ""
+            echo "**Unit tests** · threshold 85%"
+            echo '```'
+            echo "${UNIT_REPORT:-Coverage data unavailable}"
+            echo '```'
+            echo ""
+            echo "**Behavior tests** · threshold 80%"
+            echo '```'
+            echo "${BEHAVIOR_REPORT:-Coverage data unavailable}"
+            echo '```'
+
+            if [ "$LINT_RESULT" != "success" ]; then
+              echo ""
+              echo "## Lint"
+              echo ""
+              echo '```'
+              echo "$LINT_DETAILS"
+              echo '```'
+            fi
+
+            if [ -n "$BEHAVIOR_DIFF" ] && [ "$BEHAVIOR_DIFF" != "No behavior test changes." ]; then
+              echo ""
+              echo "$BEHAVIOR_DIFF"
+            fi
+          } > /tmp/comment.md
+
       - name: Find existing CI comment
         uses: peter-evans/find-comment@v3
         id: find-comment
@@ -125,30 +180,11 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: github-actions[bot]
           body-includes: <!-- ci-summary -->
+
       - name: Post CI summary comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
           edit-mode: replace
-          body: |
-            <!-- ci-summary -->
-            ## CI Summary
-
-            | Job | Status |
-            |-----|--------|
-            | Lint | ${{ needs.lint.result == 'success' && '✅' || '❌' }} |
-            | Unit Tests | ${{ needs.test-unit.result == 'success' && '✅' || '❌' }} |
-            | Behavior Tests | ${{ needs.test-behavior.result == 'success' && '✅' || '❌' }} |
-
-            **Unit test coverage:** ${{ needs.test-unit.outputs.coverage }} (threshold: 95%)
-            **Behavior test coverage:** ${{ needs.test-behavior.outputs.coverage }} (threshold: 80%)
-
-            **Lint output**
-            ```
-            ${{ needs.lint.outputs.details }}
-            ```
-
-            **Behavior test changes**
-
-            ${{ needs.test-behavior.outputs.diff }}
+          body-path: /tmp/comment.md

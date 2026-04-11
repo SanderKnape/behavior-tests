@@ -7,6 +7,7 @@
 - `go` — Go version
 - `task` — Task runner
 - `air` — Live reload for development
+- `golangci-lint` — Go linting used by `task lint`
 
 Run `mise install` to install all tools before working on this project.
 
@@ -51,7 +52,7 @@ Examples:
 - `TestBehavior_Todo_Create_PersistsAndReturns`
 - `TestBehavior_Todo_Get_Returns404ForUnknownID`
 
-**Rule: do not modify files in `cmd/api/behavior/` directly.** This repo expects behavior tests to be updated through the `/behavior-test` workflow so naming and structure stay consistent. If that workflow is unavailable in the current runtime, stop and tell the user instead of editing the files manually.
+**Rule: do not modify behavior test case files in `cmd/api/behavior/` directly.** This applies to files such as `todo_test.go` and `user_test.go`. This repo expects those tests to be updated through the `/behavior-test` workflow so naming and structure stay consistent. If that workflow is unavailable in the current runtime, stop and tell the user instead of editing the test case files manually.
 
 Test infrastructure (TestMain, helpers) lives in `cmd/api/behavior/testmain_test.go` and can be modified normally.
 

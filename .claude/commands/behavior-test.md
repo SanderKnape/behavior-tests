@@ -44,7 +44,7 @@ Each test runs in its own **REPEATABLE READ transaction** that is rolled back af
 2. Call `env := newTestEnv(t)` to get its isolated environment.
 3. Use `env.doRequest(...)` for all HTTP calls (never the package-level `doRequest`).
 
-## Available helpers (from `cmd/api/todos_integration_test.go`)
+## Available helpers (from `cmd/api/behavior/testmain_test.go`)
 
 ```go
 // newTestEnv creates a per-test router backed by a REPEATABLE READ transaction.
@@ -125,7 +125,7 @@ When in doubt: if testing it requires the DB to behave in an unusual way (fail, 
 
 - Only add or update `TestBehavior_*` functions in `cmd/api/behavior/todo_test.go` or `cmd/api/behavior/user_test.go`. Put tests in the file that matches the domain.
 - Do not modify `TestMain`, shared helpers, or other infrastructure in `cmd/api/behavior/testmain_test.go`.
-- The file must keep the `//go:build integration` tag and `package main` declaration.
+- The file must keep the `//go:build integration` tag and `package behavior` declaration.
 - Do not add table-driven tests. One function per behavior.
 - Keep assertions minimal and direct — test the behavior, not implementation details.
 - Always start with `t.Parallel()` and `env := newTestEnv(t)`.

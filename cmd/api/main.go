@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 
@@ -34,5 +35,9 @@ func main() {
 	}
 
 	r := server.New(database)
-	log.Fatal(r.Run(":8080"))
+	addr := os.Getenv("LISTEN_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	log.Fatal(r.Run(addr))
 }
