@@ -48,8 +48,17 @@ func RegisterRoutes(r *gin.Engine, database DB) {
 
 func list(database DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := database.QueryContext(c.Request.Context(),
-			`SELECT id, name, email, created_at, updated_at FROM users ORDER BY created_at DESC`)
+		query := `SELECT id, name, email, created_at, updated_at FROM users`
+		var args []any
+
+		if email, ok := c.GetQuery("email"); ok {
+			query += ` WHERE email = $1`
+			args = append(args, email)
+		}
+
+		query += ` ORDER BY created_at DESC`
+
+		rows, err := database.QueryContext(c.Request.Context(), query, args...)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return

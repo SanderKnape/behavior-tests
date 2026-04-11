@@ -234,3 +234,15 @@ func TestBehavior_User_Delete_Returns409WhenUserHasTodos(t *testing.T) {
 		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestBehavior_User_List_FilterByEmail_Returns200(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	createUser(t, env, "Email Filter User", "email-filter@example.com")
+
+	w := env.doRequest(http.MethodGet, "/users?email=email-filter@example.com", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
