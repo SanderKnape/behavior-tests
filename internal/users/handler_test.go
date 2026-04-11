@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,30 @@ func TestList_ReturnsUsers(t *testing.T) {
 	assert.Len(t, result, 2)
 	assert.Equal(t, "Alice", result[0].Name)
 	assert.Equal(t, "Bob", result[1].Name)
+}
+
+func TestList_FilterByEmail(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	rows := sqlmock.NewRows(userColumns).
+		AddRow(2, "Bob", "bob@example.com", now, now)
+	mock.ExpectQuery(regexp.QuoteMeta(
+		`SELECT id, name, email, created_at, updated_at FROM users WHERE email = $1 ORDER BY created_at DESC`,
+	)).WithArgs("bob@example.com").WillReturnRows(rows)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/users?email=bob@example.com", nil)
+	userRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []User
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 1)
+	assert.Equal(t, "Bob", result[0].Name)
+	assert.Equal(t, "bob@example.com", result[0].Email)
 }
 
 func TestList_DBError(t *testing.T) {
