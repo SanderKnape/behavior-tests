@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 )
 
@@ -35,49 +36,75 @@ func main() {
 	oldFuncs := parseBehaviorFuncs([]byte(oldSrc))
 	newFuncs := parseBehaviorFuncs(newSrc)
 
-	var added, removed, modified []string
+	type domainDiff struct {
+		added    []string
+		modified []string
+		removed  []string
+	}
+	byDomain := map[string]*domainDiff{}
+
+	domainOf := func(name string) string {
+		parts := strings.SplitN(name, "_", 3)
+		if len(parts) >= 2 {
+			return parts[1]
+		}
+		return "Other"
+	}
+	ensure := func(d string) {
+		if _, ok := byDomain[d]; !ok {
+			byDomain[d] = &domainDiff{}
+		}
+	}
 
 	for name, body := range newFuncs {
+		d := domainOf(name)
+		ensure(d)
 		if oldBody, exists := oldFuncs[name]; !exists {
-			added = append(added, name)
+			byDomain[d].added = append(byDomain[d].added, name)
 		} else if body != oldBody {
-			modified = append(modified, name)
+			byDomain[d].modified = append(byDomain[d].modified, name)
 		}
 	}
 	for name := range oldFuncs {
 		if _, exists := newFuncs[name]; !exists {
-			removed = append(removed, name)
+			d := domainOf(name)
+			ensure(d)
+			byDomain[d].removed = append(byDomain[d].removed, name)
 		}
 	}
 
-	if len(added)+len(removed)+len(modified) == 0 {
+	total := 0
+	for _, diff := range byDomain {
+		total += len(diff.added) + len(diff.modified) + len(diff.removed)
+	}
+	if total == 0 {
 		fmt.Println("No behavior test changes.")
 		return
 	}
 
+	domains := make([]string, 0, len(byDomain))
+	for d := range byDomain {
+		domains = append(domains, d)
+	}
+	sort.Strings(domains)
+
 	fmt.Println("## Behavior Changes")
 	fmt.Println()
+	for _, d := range domains {
+		diff := byDomain[d]
+		sort.Strings(diff.added)
+		sort.Strings(diff.modified)
+		sort.Strings(diff.removed)
 
-	if len(added) > 0 {
-		fmt.Println("### Added")
-		for _, name := range added {
-			fmt.Printf("- `%s`\n", name)
+		fmt.Printf("**%s**\n", d)
+		for _, name := range diff.added {
+			fmt.Printf(" + `%s`\n", name)
 		}
-		fmt.Println()
-	}
-
-	if len(modified) > 0 {
-		fmt.Println("### Modified")
-		for _, name := range modified {
-			fmt.Printf("- `%s`\n", name)
+		for _, name := range diff.modified {
+			fmt.Printf(" ~ `%s`\n", name)
 		}
-		fmt.Println()
-	}
-
-	if len(removed) > 0 {
-		fmt.Println("### Removed")
-		for _, name := range removed {
-			fmt.Printf("- `%s`\n", name)
+		for _, name := range diff.removed {
+			fmt.Printf(" - `%s`\n", name)
 		}
 		fmt.Println()
 	}
