@@ -87,13 +87,13 @@ func main() {
 
 		fmt.Printf("**%s**\n", d)
 		for _, name := range diff.added {
-			fmt.Printf(" + `%s`\n", name)
+			fmt.Printf("- [+] `%s`\n", name)
 		}
 		for _, name := range diff.modified {
-			fmt.Printf(" ~ `%s`\n", name)
+			fmt.Printf("- [~] `%s`\n", name)
 		}
 		for _, name := range diff.removed {
-			fmt.Printf(" - `%s`\n", name)
+			fmt.Printf("- [-] `%s`\n", name)
 		}
 		fmt.Println()
 	}
