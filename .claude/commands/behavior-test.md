@@ -4,15 +4,15 @@ You are a dedicated agent for writing behavior tests in this project. Your only 
 
 ## Your job
 
-Write or update `TestBehavior_*` functions in `cmd/api/behavior_integration_test.go` based on the user's request. The request may be:
+Write or update `TestBehavior_*` functions in `cmd/api/behavior/` based on the user's request. Todo tests go in `todo_test.go`; user tests go in `user_test.go`. The request may be:
 - A description of a new behavior to test ("add a test for X")
 - A reference to a recent code change ("tests for what I just added")
 - A request to update an existing test
 
 ## Before writing
 
-1. Read `cmd/api/behavior_integration_test.go` to see existing tests and avoid duplication.
-2. Read `cmd/api/todos_integration_test.go` to understand the available helpers.
+1. Read `cmd/api/behavior/todo_test.go` and `cmd/api/behavior/user_test.go` to see existing tests and avoid duplication.
+2. Read `cmd/api/behavior/testmain_test.go` to understand the available helpers.
 3. If the request references a recent code change, inspect the relevant handlers, routes, or diff so the test matches the observable behavior that was actually implemented.
 4. Base the test on externally visible API behavior, not guessed internals.
 
@@ -44,7 +44,7 @@ Each test runs in its own **REPEATABLE READ transaction** that is rolled back af
 2. Call `env := newTestEnv(t)` to get its isolated environment.
 3. Use `env.doRequest(...)` for all HTTP calls (never the package-level `doRequest`).
 
-## Available helpers (from `cmd/api/todos_integration_test.go`)
+## Available helpers (from `cmd/api/behavior/testmain_test.go`)
 
 ```go
 // newTestEnv creates a per-test router backed by a REPEATABLE READ transaction.
@@ -56,6 +56,9 @@ env.doRequest(method, path string, body any) *httptest.ResponseRecorder
 
 // POST /todos, assert 201, and return the decoded todo. Use for test setup.
 createTodo(t *testing.T, env *testEnv, title string, userID int64) todos.Todo
+
+// POST /users, assert 201, and return the decoded user. Use for test setup.
+createUser(t *testing.T, env *testEnv, name, email string) users.User
 
 // Decode the JSON response body into type T.
 decode[T any](w *httptest.ResponseRecorder) T
@@ -98,13 +101,33 @@ func TestBehavior_Todo_Get_ReturnsMatchingTodo(t *testing.T) {
 }
 ```
 
+## What belongs here vs. in unit tests
+
+Behavior tests and unit tests (in `internal/<domain>/handler_test.go`) complement each other. Write behavior tests for:
+
+- **Happy paths** — successful creates, reads, updates, deletes
+- **404s** — unknown IDs
+- **Validation rejections** — missing required fields (400)
+- **Cross-resource flows** — anything that requires real FK relationships or seeded data
+
+Leave these to unit tests (sqlmock), which can reach them without a real DB:
+
+- **DB error paths** — 500 responses when the database fails
+- **Partial update correctness** — verifying COALESCE doesn't wipe unset fields
+
+Both suites cover this (no need to add again if already present in unit tests):
+
+- **Invalid ID format** — `GET /todos/abc` returning 400. Unit tests cover this via sqlmock; behavior tests also cover it to verify the full routing stack handles it correctly.
+
+When in doubt: if testing it requires the DB to behave in an unusual way (fail, return corrupt data), it's a unit test. If it's observable from normal API usage, it's a behavior test.
+
 ## Rules
 
-- Only add or update `TestBehavior_*` functions in `cmd/api/behavior_integration_test.go`.
-- Do not modify `TestMain`, shared helpers, or other infrastructure in `cmd/api/todos_integration_test.go`.
-- The file must keep the `//go:build integration` tag and `package main` declaration.
+- Only add or update `TestBehavior_*` functions in `cmd/api/behavior/todo_test.go` or `cmd/api/behavior/user_test.go`. Put tests in the file that matches the domain.
+- Do not modify `TestMain`, shared helpers, or other infrastructure in `cmd/api/behavior/testmain_test.go`.
+- The file must keep the `//go:build integration` tag and `package behavior` declaration.
 - Do not add table-driven tests. One function per behavior.
 - Keep assertions minimal and direct — test the behavior, not implementation details.
 - Always start with `t.Parallel()` and `env := newTestEnv(t)`.
-- Always use `createTodo` (or similar setup helpers) for setup data — never inline `doRequest` + `decode` without asserting the status code first.
+- Always use `createTodo`/`createUser` (or similar setup helpers) for setup data — never inline `doRequest` + `decode` without asserting the status code first.
 - Never assert exact list counts; the shared DB may contain seeded data alongside test data.

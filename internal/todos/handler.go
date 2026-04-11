@@ -50,7 +50,7 @@ func list(database DB) gin.HandlerFunc {
 		rows, err := database.QueryContext(c.Request.Context(),
 			`SELECT id, user_id, title, completed, created_at, updated_at FROM todos ORDER BY created_at DESC`)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 		defer func() { _ = rows.Close() }()
@@ -59,10 +59,14 @@ func list(database DB) gin.HandlerFunc {
 		for rows.Next() {
 			var t Todo
 			if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Completed, &t.CreatedAt, &t.UpdatedAt); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 				return
 			}
 			result = append(result, t)
+		}
+		if err := rows.Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
 		}
 
 		c.JSON(http.StatusOK, result)
@@ -84,7 +88,7 @@ func create(database DB) gin.HandlerFunc {
 			req.UserID, req.Title,
 		).Scan(&t.ID, &t.UserID, &t.Title, &t.Completed, &t.CreatedAt, &t.UpdatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -109,7 +113,7 @@ func get(database DB) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -146,7 +150,7 @@ func update(database DB) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -165,7 +169,7 @@ func delete(database DB) gin.HandlerFunc {
 		result, err := database.ExecContext(c.Request.Context(),
 			`DELETE FROM todos WHERE id = $1`, id)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 

@@ -3,14 +3,12 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
+	"os"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
-	"me/internal/db"
-	"me/internal/todos"
-	"me/internal/users"
+	"me/cmd/api/server"
+	"me/internal/platform/db"
 )
 
 func main() {
@@ -19,30 +17,27 @@ func main() {
 
 	_ = godotenv.Load()
 
-	database := db.Open()
+	database, err := db.Open()
+	if err != nil {
+		log.Fatalf("database: %v", err)
+	}
 	defer func() { _ = database.Close() }()
 
-	db.RunMigrations(database)
+	if err := db.RunMigrations(database); err != nil {
+		log.Fatalf("migrations: %v", err)
+	}
 
 	if *seed {
-		db.RunSeeds(database)
+		if err := db.RunSeeds(database); err != nil {
+			log.Fatalf("seeds: %v", err)
+		}
 		return
 	}
 
-	r := setupRouter(database)
-	log.Fatal(r.Run(":8080"))
-}
-
-func setupRouter(database todos.DB) *gin.Engine {
-	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery())
-
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Hello, World!"})
-	})
-
-	todos.RegisterRoutes(r, database)
-	users.RegisterRoutes(r, database)
-
-	return r
+	r := server.New(database)
+	addr := os.Getenv("LISTEN_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	log.Fatal(r.Run(addr))
 }

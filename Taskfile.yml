@@ -26,12 +26,22 @@ tasks:
     cmd: golangci-lint run ./...
 
   test:unit:
-    desc: Run unit tests
-    cmd: go test -cover ./...
+    desc: Run unit tests and generate coverage profile (unit_coverage.out)
+    cmd: go test -coverprofile=unit_coverage.out ./internal/...
+
+  test:unit:coverage:
+    desc: Run unit tests and assert coverage >= 85% across all internal packages
+    deps: [test:unit]
+    cmd: go run ./cmd/coverreport/ -threshold 85 -label "unit test" unit_coverage.out
 
   test:behavior:
-    desc: Run behavior/integration tests (spins up a throwaway postgres via Docker)
-    cmd: go test -tags integration -v -coverpkg=./... -coverprofile=coverage.out ./...
+    desc: Run behavior/integration tests and generate coverage profile (coverage.out)
+    cmd: go test -tags integration -v -coverpkg=./... -coverprofile=coverage.out ./cmd/api/behavior/
+
+  test:behavior:coverage:
+    desc: Run behavior tests and assert coverage >= 80% across business logic (excludes internal/platform)
+    deps: [test:behavior]
+    cmd: go run ./cmd/coverreport/ -threshold 80 -filter internal/ -exclude internal/platform -label "behavior test" coverage.out
 
   behavior:diff:
     desc: Show which behavior tests changed since last commit

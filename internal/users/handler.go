@@ -49,7 +49,7 @@ func list(database DB) gin.HandlerFunc {
 		rows, err := database.QueryContext(c.Request.Context(),
 			`SELECT id, name, email, created_at, updated_at FROM users ORDER BY created_at DESC`)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 		defer func() { _ = rows.Close() }()
@@ -58,10 +58,14 @@ func list(database DB) gin.HandlerFunc {
 		for rows.Next() {
 			var u User
 			if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt, &u.UpdatedAt); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 				return
 			}
 			result = append(result, u)
+		}
+		if err := rows.Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
 		}
 
 		c.JSON(http.StatusOK, result)
@@ -82,7 +86,7 @@ func create(database DB) gin.HandlerFunc {
 			req.Name, req.Email,
 		).Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt, &u.UpdatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -107,7 +111,7 @@ func get(database DB) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -139,7 +143,7 @@ func update(database DB) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -158,7 +162,7 @@ func delete(database DB) gin.HandlerFunc {
 		result, err := database.ExecContext(c.Request.Context(),
 			`DELETE FROM users WHERE id = $1`, id)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 

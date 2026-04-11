@@ -7,6 +7,7 @@
 - `go` — Go version
 - `task` — Task runner
 - `air` — Live reload for development
+- `golangci-lint` — Go linting used by `task lint`
 
 Run `mise install` to install all tools before working on this project.
 
@@ -18,27 +19,31 @@ Run `mise install` to install all tools before working on this project.
 | `task dev`   | Start dev server with live reload (via `air`) |
 | `task run`   | Run the application                |
 | `task build` | Build binary to `bin/app`          |
-| `task test`  | Run tests                          |
 | `task tidy`  | Tidy Go modules                    |
-| `task lint`            | Run Go linting checks (`golangci-lint`)             |
-| `task seed`            | Seed DB with test data                              |
-| `task test:unit`       | Run unit tests                                      |
-| `task test:behavior`   | Run behavior/integration tests (spins up postgres via Docker)|
-| `task up`              | Start full stack in Docker with live rebuild on changes |
-| `task behavior:diff`   | Show which behavior tests changed since last commit |
+| `task lint`                  | Run Go linting checks (`golangci-lint`)                     |
+| `task seed`                  | Seed DB with test data                                      |
+| `task test:unit`             | Run unit tests and generate `unit_coverage.out`             |
+| `task test:unit:coverage`    | Run unit tests and assert coverage ≥ 85% across all `internal/` packages |
+| `task test:behavior`         | Run behavior/integration tests (spins up postgres via Docker) and generate `coverage.out` |
+| `task test:behavior:coverage`| Run behavior tests and assert coverage ≥ 80%               |
+| `task up`                    | Start full stack in Docker with live rebuild on changes      |
+| `task behavior:diff`         | Show which behavior tests changed since last commit         |
 
 ## Verification
 
 Run the narrowest checks that match the change, and mention anything you could not run.
 
-- Default for code changes: `task test`
-- If you changed build wiring, CLI startup, or dependencies: `task build` and `task test`
-- If you changed API handlers, database code, migrations, seeds, or integration test helpers: `task test:behavior`
-- If behavior tests changed through the behavior-test workflow: `task behavior:diff` and `task test:behavior`
+- Default for any code change: `task lint` and `task test:unit:coverage`
+- If you changed API handlers, database code, migrations, seeds, or integration test helpers: also run `task test:behavior:coverage`
+- If you changed build wiring, CLI startup, or dependencies: also run `task build`
+- If behavior tests changed through the behavior-test workflow: `task behavior:diff` and `task test:behavior:coverage`
 
 ## Behavior Tests
 
-Integration tests that verify the observable behavior of the API live in `cmd/api/behavior_integration_test.go`.
+Integration tests that verify the observable behavior of the API live in `cmd/api/behavior/`:
+
+- `todo_test.go` — `TestBehavior_Todo_*` functions
+- `user_test.go` — `TestBehavior_User_*` functions
 
 **Naming convention:** `TestBehavior_<Domain>_<Action>_<Expectation>`
 
@@ -47,9 +52,9 @@ Examples:
 - `TestBehavior_Todo_Create_PersistsAndReturns`
 - `TestBehavior_Todo_Get_Returns404ForUnknownID`
 
-**Rule: do not modify `cmd/api/behavior_integration_test.go` directly.** This repo expects behavior tests to be updated through the `/behavior-test` workflow so naming and structure stay consistent. If that workflow is unavailable in the current runtime, stop and tell the user instead of editing the file manually.
+**Rule: do not modify behavior test case files in `cmd/api/behavior/` directly.** This applies to files such as `todo_test.go` and `user_test.go`. This repo expects those tests to be updated through the `/behavior-test` workflow so naming and structure stay consistent. If that workflow is unavailable in the current runtime, stop and tell the user instead of editing the test case files manually.
 
-Test infrastructure (TestMain, helpers) lives in `cmd/api/todos_integration_test.go` and can be modified normally.
+Test infrastructure (TestMain, helpers) lives in `cmd/api/behavior/testmain_test.go` and can be modified normally.
 
 ## Database
 
@@ -57,8 +62,8 @@ PostgreSQL 18.x is used locally and in tests. The current repo wiring pins `post
 
 ### Structure
 
-- `internal/db/migrations/` — schema migrations (`000001_create_todos.up.sql` / `.down.sql`). Auto-applied at startup.
-- `internal/db/seeds/001_todos.sql` — test data. Run with `task seed` (idempotent only if table is empty).
+- `internal/platform/db/migrations/` — schema migrations (`000001_create_todos.up.sql` / `.down.sql`). Auto-applied at startup.
+- `internal/platform/db/seeds/001_todos.sql` — test data. Run with `task seed` (idempotent only if table is empty).
 
 ### Local development
 
