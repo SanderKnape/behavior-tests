@@ -101,6 +101,8 @@ Keep these constraints in mind during review even if other context is noisy:
 - behavior test case files in `cmd/api/behavior/` may need to change when observable behavior changes, but those updates should go through the `/behavior-test` workflow rather than direct manual edits
 - new observable API behavior should come with behavior-test coverage, and new internal branches or DB-error paths should come with unit coverage where appropriate
 
+When reviewing a PR, do not infer from the git diff alone that changes to `cmd/api/behavior/` violated the `/behavior-test` workflow. Assume those test-case changes were produced through the approved workflow unless the PR explicitly says otherwise or the content of the tests suggests a real issue.
+
 ## Review Output
 
 When producing review feedback:
