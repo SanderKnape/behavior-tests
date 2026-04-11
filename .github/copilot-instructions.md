@@ -76,9 +76,9 @@ Do not directly modify behavior test case files in `cmd/api/behavior/`, includin
 - `cmd/api/behavior/todo_test.go`
 - `cmd/api/behavior/user_test.go`
 
-Those files must be updated through the `/behavior-test` workflow so naming and structure stay consistent.
+Those files must be updated through the `/behavior-test` skill so naming and structure stay consistent.
 
-If a requested change requires behavior-test case updates and that workflow is unavailable, stop and say so instead of editing the files manually.
+If a requested change requires behavior-test case updates and that skill is unavailable, stop and say so instead of editing the files manually.
 
 You may modify shared behavior-test infrastructure in `cmd/api/behavior/testmain_test.go` when needed.
 
@@ -208,7 +208,7 @@ Also run `task build` if you changed:
 - CLI startup
 - dependencies
 
-If behavior tests changed through the approved workflow, also run:
+If behavior tests changed through the approved skill, also run:
 
 - `task behavior:diff`
 - `task test:behavior:coverage`
