@@ -85,6 +85,47 @@ func TestList_FilterCompleted(t *testing.T) {
 	}
 }
 
+func TestList_FilterUserID(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	rows := sqlmock.NewRows(todoColumns).AddRow(1, 42, "Buy milk", false, now, now)
+	mock.ExpectQuery(".*").WithArgs(int64(42)).WillReturnRows(rows)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?user_id=42", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []Todo
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 1)
+	assert.Equal(t, int64(42), result[0].UserID)
+}
+
+func TestList_FilterCompletedAndUserID(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	rows := sqlmock.NewRows(todoColumns).AddRow(1, 42, "Buy milk", true, now, now)
+	mock.ExpectQuery(".*").WithArgs(true, int64(42)).WillReturnRows(rows)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?completed=true&user_id=42", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []Todo
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 1)
+	assert.True(t, result[0].Completed)
+	assert.Equal(t, int64(42), result[0].UserID)
+}
+
 func TestList_FilterCompleted_InvalidValue(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
@@ -92,6 +133,18 @@ func TestList_FilterCompleted_InvalidValue(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/todos?completed=maybe", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestList_FilterUserID_InvalidValue(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?user_id=abc", nil)
 	todoRouter(db).ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)

@@ -253,3 +253,91 @@ func TestBehavior_Todo_List_FilterByCompleted_Returns400ForInvalidValue(t *testi
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestBehavior_Todo_List_FilterByUserID_ReturnsOnlyMatchingUsersTodos(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Todo Owner", "todo-owner@example.com")
+	otherUser := createUser(t, env, "Other Owner", "other-owner@example.com")
+
+	matching := createTodo(t, env, "match me", user.ID)
+	other := createTodo(t, env, "not me", otherUser.ID)
+
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?user_id=%d", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	foundMatching := false
+	for _, todo := range result {
+		if todo.ID == other.ID {
+			t.Fatalf("expected todo %d to be excluded from user_id filter", other.ID)
+		}
+		if todo.UserID != user.ID {
+			t.Fatalf("expected only todos for user %d, got todo %d for user %d", user.ID, todo.ID, todo.UserID)
+		}
+		if todo.ID == matching.ID {
+			foundMatching = true
+		}
+	}
+
+	if !foundMatching {
+		t.Fatalf("expected filtered list to include created todo %d", matching.ID)
+	}
+}
+
+func TestBehavior_Todo_List_FilterByCompletedAndUserID_ReturnsOnlyMatchingTodos(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Combined Filter User", "combined-filter@example.com")
+	otherUser := createUser(t, env, "Other Combined User", "other-combined@example.com")
+
+	matching := createTodo(t, env, "match me", user.ID)
+	env.doRequest(http.MethodPut, fmt.Sprintf("/todos/%d", matching.ID), map[string]any{"completed": true})
+
+	sameUserIncomplete := createTodo(t, env, "same user incomplete", user.ID)
+	otherUserCompleted := createTodo(t, env, "other user complete", otherUser.ID)
+	env.doRequest(http.MethodPut, fmt.Sprintf("/todos/%d", otherUserCompleted.ID), map[string]any{"completed": true})
+
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?completed=true&user_id=%d", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	foundMatching := false
+	for _, todo := range result {
+		if todo.ID == sameUserIncomplete.ID {
+			t.Fatalf("expected incomplete todo %d to be excluded from combined filter", sameUserIncomplete.ID)
+		}
+		if todo.ID == otherUserCompleted.ID {
+			t.Fatalf("expected other user's todo %d to be excluded from combined filter", otherUserCompleted.ID)
+		}
+		if todo.UserID != user.ID {
+			t.Fatalf("expected only todos for user %d, got todo %d for user %d", user.ID, todo.ID, todo.UserID)
+		}
+		if !todo.Completed {
+			t.Fatalf("expected only completed todos, got todo %d with completed=false", todo.ID)
+		}
+		if todo.ID == matching.ID {
+			foundMatching = true
+		}
+	}
+
+	if !foundMatching {
+		t.Fatalf("expected filtered list to include created todo %d", matching.ID)
+	}
+}
+
+func TestBehavior_Todo_List_FilterByUserID_Returns400ForInvalidValue(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodGet, "/todos?user_id=abc", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
