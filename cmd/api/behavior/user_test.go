@@ -235,6 +235,21 @@ func TestBehavior_User_Delete_Returns409WhenUserHasTodos(t *testing.T) {
 	}
 }
 
+func TestBehavior_User_List_FilterByEmail_ReturnsEmptyListForNonMatchingEmail(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodGet, "/users?email=does-not-exist@example.com", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]users.User](w)
+	if len(result) != 0 {
+		t.Fatalf("expected empty list for non-matching email filter, got %d users", len(result))
+	}
+}
+
 func TestBehavior_User_List_FilterByEmail_ReturnsOnlyMatchingUsers(t *testing.T) {
 	t.Parallel()
 	env := newTestEnv(t)
