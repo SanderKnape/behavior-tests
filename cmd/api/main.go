@@ -3,14 +3,11 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
+	"me/cmd/api/server"
 	"me/internal/platform/db"
-	"me/internal/todos"
-	"me/internal/users"
 )
 
 func main() {
@@ -36,20 +33,6 @@ func main() {
 		return
 	}
 
-	r := setupRouter(database)
+	r := server.New(database)
 	log.Fatal(r.Run(":8080"))
-}
-
-func setupRouter(database todos.DB) *gin.Engine {
-	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery())
-
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Hello, World!"})
-	})
-
-	todos.RegisterRoutes(r, database)
-	users.RegisterRoutes(r, database)
-
-	return r
 }

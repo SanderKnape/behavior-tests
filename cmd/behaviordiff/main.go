@@ -9,11 +9,12 @@ import (
 	"go/token"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 )
 
-const behaviorFile = "cmd/api/behavior_integration_test.go"
+const behaviorDir = "cmd/api/behavior"
 
 func main() {
 	ref := "HEAD"
@@ -21,20 +22,8 @@ func main() {
 		ref = os.Args[1]
 	}
 
-	oldSrc, err := gitShow(ref, behaviorFile)
-	if err != nil {
-		// File didn't exist at that ref — all current tests are new
-		oldSrc = ""
-	}
-
-	newSrc, err := os.ReadFile(behaviorFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading %s: %v\n", behaviorFile, err)
-		os.Exit(1)
-	}
-
-	oldFuncs := parseBehaviorFuncs([]byte(oldSrc))
-	newFuncs := parseBehaviorFuncs(newSrc)
+	oldFuncs := parseDirAtRef(ref)
+	newFuncs := parseDirOnDisk()
 
 	type domainDiff struct {
 		added    []string
@@ -108,6 +97,53 @@ func main() {
 		}
 		fmt.Println()
 	}
+}
+
+func parseDirOnDisk() map[string]string {
+	entries, err := os.ReadDir(behaviorDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading %s: %v\n", behaviorDir, err)
+		os.Exit(1)
+	}
+
+	funcs := map[string]string{}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(filepath.Join(behaviorDir, entry.Name()))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading %s: %v\n", entry.Name(), err)
+			continue
+		}
+		for name, body := range parseBehaviorFuncs(src) {
+			funcs[name] = body
+		}
+	}
+	return funcs
+}
+
+func parseDirAtRef(ref string) map[string]string {
+	out, err := exec.Command("git", "ls-tree", "--name-only", ref, behaviorDir+"/").Output()
+	if err != nil {
+		// Directory didn't exist at that ref — treat all current tests as new
+		return map[string]string{}
+	}
+
+	funcs := map[string]string{}
+	for _, name := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if name == "" || !strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		src, err := gitShow(ref, behaviorDir+"/"+name)
+		if err != nil {
+			continue
+		}
+		for fname, body := range parseBehaviorFuncs([]byte(src)) {
+			funcs[fname] = body
+		}
+	}
+	return funcs
 }
 
 func gitShow(ref, path string) (string, error) {

@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package behavior
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	"me/cmd/api/server"
 	"me/internal/platform/db"
 	"me/internal/todos"
 	"me/internal/users"
@@ -49,7 +50,7 @@ func run(m *testing.M) int {
 		return 1
 	}
 
-	os.Setenv("DATABASE_URL", connStr)
+	os.Setenv("DATABASE_URL", connStr) //nolint:errcheck
 
 	var dbErr error
 	testDB, dbErr = db.Open()
@@ -73,9 +74,6 @@ func run(m *testing.M) int {
 	return m.Run()
 }
 
-// testEnv holds a per-test router backed by a REPEATABLE READ transaction.
-// The transaction is rolled back automatically via t.Cleanup, so each test
-// starts from a clean slate and tests can safely run in parallel.
 type testEnv struct {
 	router *gin.Engine
 }
@@ -91,7 +89,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	}
 	t.Cleanup(func() { tx.Rollback() }) //nolint:errcheck
 
-	return &testEnv{router: setupRouter(tx)}
+	return &testEnv{router: server.New(tx)}
 }
 
 func (e *testEnv) doRequest(method, path string, body any) *httptest.ResponseRecorder {
@@ -113,8 +111,6 @@ func (e *testEnv) doRequest(method, path string, body any) *httptest.ResponseRec
 	return w
 }
 
-// createTodo is a helper that POSTs a new todo, asserts the 201 response, and
-// returns the decoded todo. Use this for test setup rather than inline calls.
 func createTodo(t *testing.T, env *testEnv, title string, userID int64) todos.Todo {
 	t.Helper()
 
@@ -129,10 +125,9 @@ func createTodo(t *testing.T, env *testEnv, title string, userID int64) todos.To
 	return decode[todos.Todo](w)
 }
 
-// createUser is a helper that POSTs a new user, asserts the 201 response, and
-// returns the decoded user. Use this for test setup rather than inline calls.
 func createUser(t *testing.T, env *testEnv, name, email string) users.User {
 	t.Helper()
+
 	w := env.doRequest(http.MethodPost, "/users", map[string]any{
 		"name":  name,
 		"email": email,
@@ -140,10 +135,10 @@ func createUser(t *testing.T, env *testEnv, name, email string) users.User {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("setup POST /users: expected 201, got %d: %s", w.Code, w.Body.String())
 	}
+
 	return decode[users.User](w)
 }
 
-// decode unmarshals the JSON response body into T.
 func decode[T any](w *httptest.ResponseRecorder) T {
 	var v T
 	json.NewDecoder(w.Body).Decode(&v) //nolint:errcheck

@@ -49,7 +49,7 @@ tasks:
 
   test:behavior:
     desc: Run behavior/integration tests and generate coverage profile (coverage.out)
-    cmd: go test -tags integration -v -coverpkg=./... -coverprofile=coverage.out ./cmd/api/
+    cmd: go test -tags integration -v -coverpkg=./... -coverprofile=coverage.out ./cmd/api/behavior/
 
   test:behavior:coverage:
     desc: Run behavior tests and assert coverage >= 80% across business logic (excludes internal/platform)

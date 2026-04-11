@@ -39,7 +39,10 @@ Run the narrowest checks that match the change, and mention anything you could n
 
 ## Behavior Tests
 
-Integration tests that verify the observable behavior of the API live in `cmd/api/behavior_integration_test.go`.
+Integration tests that verify the observable behavior of the API live in `cmd/api/behavior/`:
+
+- `todo_test.go` — `TestBehavior_Todo_*` functions
+- `user_test.go` — `TestBehavior_User_*` functions
 
 **Naming convention:** `TestBehavior_<Domain>_<Action>_<Expectation>`
 
@@ -48,9 +51,9 @@ Examples:
 - `TestBehavior_Todo_Create_PersistsAndReturns`
 - `TestBehavior_Todo_Get_Returns404ForUnknownID`
 
-**Rule: do not modify `cmd/api/behavior_integration_test.go` directly.** This repo expects behavior tests to be updated through the `/behavior-test` workflow so naming and structure stay consistent. If that workflow is unavailable in the current runtime, stop and tell the user instead of editing the file manually.
+**Rule: do not modify files in `cmd/api/behavior/` directly.** This repo expects behavior tests to be updated through the `/behavior-test` workflow so naming and structure stay consistent. If that workflow is unavailable in the current runtime, stop and tell the user instead of editing the files manually.
 
-Test infrastructure (TestMain, helpers) lives in `cmd/api/todos_integration_test.go` and can be modified normally.
+Test infrastructure (TestMain, helpers) lives in `cmd/api/behavior/testmain_test.go` and can be modified normally.
 
 ## Database
 

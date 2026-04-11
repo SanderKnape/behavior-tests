@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"me/cmd/api/server"
 )
 
 func TestHelloWorld(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	r := setupRouter(nil)
+	r := server.New(nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
