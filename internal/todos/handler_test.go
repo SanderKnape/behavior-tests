@@ -133,7 +133,7 @@ func TestList_Pagination_Limit(t *testing.T) {
 
 	now := time.Now()
 	rows := sqlmock.NewRows(todoColumns).AddRow(1, 10, "Buy milk", false, now, now)
-	mock.ExpectQuery(".*").WithArgs(int64(5)).WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT.*LIMIT \$1`).WithArgs(int64(5)).WillReturnRows(rows)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/todos?limit=5", nil)
@@ -143,6 +143,7 @@ func TestList_Pagination_Limit(t *testing.T) {
 	var result []Todo
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
 	assert.Len(t, result, 1)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestList_Pagination_Offset(t *testing.T) {
@@ -152,7 +153,7 @@ func TestList_Pagination_Offset(t *testing.T) {
 
 	now := time.Now()
 	rows := sqlmock.NewRows(todoColumns).AddRow(2, 10, "Walk dog", true, now, now)
-	mock.ExpectQuery(".*").WithArgs(int64(1)).WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT.*OFFSET \$1`).WithArgs(int64(1)).WillReturnRows(rows)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/todos?offset=1", nil)
@@ -162,6 +163,7 @@ func TestList_Pagination_Offset(t *testing.T) {
 	var result []Todo
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
 	assert.Len(t, result, 1)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestList_Pagination_LimitAndOffset(t *testing.T) {
@@ -171,7 +173,7 @@ func TestList_Pagination_LimitAndOffset(t *testing.T) {
 
 	now := time.Now()
 	rows := sqlmock.NewRows(todoColumns).AddRow(2, 10, "Walk dog", true, now, now)
-	mock.ExpectQuery(".*").WithArgs(int64(5), int64(10)).WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT.*LIMIT \$1.*OFFSET \$2`).WithArgs(int64(5), int64(10)).WillReturnRows(rows)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/todos?limit=5&offset=10", nil)
@@ -181,6 +183,7 @@ func TestList_Pagination_LimitAndOffset(t *testing.T) {
 	var result []Todo
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
 	assert.Len(t, result, 1)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestList_Pagination_InvalidLimit(t *testing.T) {

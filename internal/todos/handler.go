@@ -78,7 +78,7 @@ func list(database DB) gin.HandlerFunc {
 			query += ` WHERE ` + strings.Join(conditions, ` AND `)
 		}
 
-		query += ` ORDER BY created_at DESC`
+		query += ` ORDER BY created_at DESC, id DESC`
 
 		if raw, ok := c.GetQuery("limit"); ok {
 			limit, err := strconv.ParseInt(raw, 10, 64)
