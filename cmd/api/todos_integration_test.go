@@ -51,11 +51,22 @@ func run(m *testing.M) int {
 
 	os.Setenv("DATABASE_URL", connStr)
 
-	testDB = db.Open()
-	defer testDB.Close()
+	var dbErr error
+	testDB, dbErr = db.Open()
+	if dbErr != nil {
+		fmt.Printf("failed to open database: %v\n", dbErr)
+		return 1
+	}
+	defer testDB.Close() //nolint:errcheck
 
-	db.RunMigrations(testDB)
-	db.RunSeeds(testDB)
+	if err := db.RunMigrations(testDB); err != nil {
+		fmt.Printf("failed to run migrations: %v\n", err)
+		return 1
+	}
+	if err := db.RunSeeds(testDB); err != nil {
+		fmt.Printf("failed to run seeds: %v\n", err)
+		return 1
+	}
 
 	gin.SetMode(gin.TestMode)
 

@@ -22,7 +22,7 @@ Run `mise install` to install all tools before working on this project.
 | `task lint`                  | Run Go linting checks (`golangci-lint`)                     |
 | `task seed`                  | Seed DB with test data                                      |
 | `task test:unit`             | Run unit tests and generate `unit_coverage.out`             |
-| `task test:unit:coverage`    | Run unit tests and assert coverage ≥ 95%                    |
+| `task test:unit:coverage`    | Run unit tests and assert coverage ≥ 85% across all `internal/` packages |
 | `task test:behavior`         | Run behavior/integration tests (spins up postgres via Docker) and generate `coverage.out` |
 | `task test:behavior:coverage`| Run behavior tests and assert coverage ≥ 80%               |
 | `task up`                    | Start full stack in Docker with live rebuild on changes      |

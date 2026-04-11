@@ -19,13 +19,20 @@ func main() {
 
 	_ = godotenv.Load()
 
-	database := db.Open()
+	database, err := db.Open()
+	if err != nil {
+		log.Fatalf("database: %v", err)
+	}
 	defer func() { _ = database.Close() }()
 
-	db.RunMigrations(database)
+	if err := db.RunMigrations(database); err != nil {
+		log.Fatalf("migrations: %v", err)
+	}
 
 	if *seed {
-		db.RunSeeds(database)
+		if err := db.RunSeeds(database); err != nil {
+			log.Fatalf("seeds: %v", err)
+		}
 		return
 	}
 

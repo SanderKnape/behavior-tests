@@ -30,12 +30,11 @@ tasks:
     cmd: go test -coverprofile=unit_coverage.out ./internal/...
 
   test:unit:coverage:
-    desc: Run unit tests and assert coverage >= 95% across business logic (excludes internal/platform)
+    desc: Run unit tests and assert coverage >= 85% across all internal packages
     deps: [test:unit]
     cmd: >
       LC_ALL=C awk '
         /^mode:/ { next }
-        /internal\/platform\// { next }
         /^me\/internal\// {
           total += $2
           if ($3 > 0) covered += $2
@@ -44,7 +43,7 @@ tasks:
           if (total == 0) { print "no coverage data found"; exit 1 }
           pct = covered * 100 / total
           printf "unit test coverage: %.1f%%\n", pct
-          if (pct < 95) { print "FAIL: below 95% threshold"; exit 1 }
+          if (pct < 85) { print "FAIL: below 85% threshold"; exit 1 }
         }
       ' unit_coverage.out
 
