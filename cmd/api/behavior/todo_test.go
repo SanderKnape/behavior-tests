@@ -341,3 +341,87 @@ func TestBehavior_Todo_List_FilterByUserID_Returns400ForInvalidValue(t *testing.
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestBehavior_Todo_List_LimitRestrictsResults(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Limit Test User", "limit-test@example.com")
+	createTodo(t, env, "todo one", user.ID)
+	createTodo(t, env, "todo two", user.ID)
+	createTodo(t, env, "todo three", user.ID)
+
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?user_id=%d&limit=2", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 todos with limit=2, got %d", len(result))
+	}
+}
+
+func TestBehavior_Todo_List_OffsetSkipsResults(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Offset Test User", "offset-test@example.com")
+	createTodo(t, env, "todo one", user.ID)
+	createTodo(t, env, "todo two", user.ID)
+	createTodo(t, env, "todo three", user.ID)
+
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?user_id=%d&offset=2", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 todo with offset=2 out of 3, got %d", len(result))
+	}
+}
+
+func TestBehavior_Todo_List_LimitAndOffsetPage(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Page Test User", "page-test@example.com")
+	createTodo(t, env, "first", user.ID)
+	middle := createTodo(t, env, "middle", user.ID)
+	createTodo(t, env, "last", user.ID)
+
+	// ORDER BY created_at DESC: last, middle, first — offset=1 skips "last", limit=1 returns "middle"
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?user_id=%d&limit=1&offset=1", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 todo, got %d", len(result))
+	}
+	if result[0].ID != middle.ID {
+		t.Fatalf("expected middle todo (ID %d), got ID %d", middle.ID, result[0].ID)
+	}
+}
+
+func TestBehavior_Todo_List_InvalidLimitReturnsBadRequest(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodGet, "/todos?limit=0", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBehavior_Todo_List_InvalidOffsetReturnsBadRequest(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodGet, "/todos?offset=-1", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

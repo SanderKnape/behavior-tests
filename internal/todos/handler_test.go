@@ -126,6 +126,91 @@ func TestList_FilterCompletedAndUserID(t *testing.T) {
 	assert.Equal(t, int64(42), result[0].UserID)
 }
 
+func TestList_Pagination_Limit(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	rows := sqlmock.NewRows(todoColumns).AddRow(1, 10, "Buy milk", false, now, now)
+	mock.ExpectQuery(".*").WithArgs(int64(5)).WillReturnRows(rows)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?limit=5", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []Todo
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 1)
+}
+
+func TestList_Pagination_Offset(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	rows := sqlmock.NewRows(todoColumns).AddRow(2, 10, "Walk dog", true, now, now)
+	mock.ExpectQuery(".*").WithArgs(int64(1)).WillReturnRows(rows)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?offset=1", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []Todo
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 1)
+}
+
+func TestList_Pagination_LimitAndOffset(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	rows := sqlmock.NewRows(todoColumns).AddRow(2, 10, "Walk dog", true, now, now)
+	mock.ExpectQuery(".*").WithArgs(int64(5), int64(10)).WillReturnRows(rows)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?limit=5&offset=10", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []Todo
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 1)
+}
+
+func TestList_Pagination_InvalidLimit(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	for _, val := range []string{"abc", "0", "-1"} {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/todos?limit="+val, nil)
+		todoRouter(db).ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "expected 400 for limit=%s", val)
+	}
+}
+
+func TestList_Pagination_InvalidOffset(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	for _, val := range []string{"abc", "-1"} {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/todos?offset="+val, nil)
+		todoRouter(db).ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "expected 400 for offset=%s", val)
+	}
+}
+
 func TestList_FilterCompleted_InvalidValue(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)

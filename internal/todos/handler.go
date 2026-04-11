@@ -80,6 +80,26 @@ func list(database DB) gin.HandlerFunc {
 
 		query += ` ORDER BY created_at DESC`
 
+		if raw, ok := c.GetQuery("limit"); ok {
+			limit, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || limit < 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be a positive integer"})
+				return
+			}
+			args = append(args, limit)
+			query += ` LIMIT $` + strconv.Itoa(len(args))
+		}
+
+		if raw, ok := c.GetQuery("offset"); ok {
+			offset, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || offset < 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "offset must be a non-negative integer"})
+				return
+			}
+			args = append(args, offset)
+			query += ` OFFSET $` + strconv.Itoa(len(args))
+		}
+
 		rows, err := database.QueryContext(c.Request.Context(), query, args...)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
