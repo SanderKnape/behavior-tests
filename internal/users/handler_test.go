@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -70,7 +71,9 @@ func TestList_FilterByEmail(t *testing.T) {
 	now := time.Now()
 	rows := sqlmock.NewRows(userColumns).
 		AddRow(2, "Bob", "bob@example.com", now, now)
-	mock.ExpectQuery(".*").WithArgs("bob@example.com").WillReturnRows(rows)
+	mock.ExpectQuery(regexp.QuoteMeta(
+		`SELECT id, name, email, created_at, updated_at FROM users WHERE email = $1 ORDER BY created_at DESC`,
+	)).WithArgs("bob@example.com").WillReturnRows(rows)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/users?email=bob@example.com", nil)
