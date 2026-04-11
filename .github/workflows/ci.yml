@@ -11,6 +11,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-24.04
+    outputs:
+      details: ${{ steps.lint-run.outputs.details }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/cache@v5
@@ -22,11 +24,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - uses: jdx/mise-action@v4
-      - run: task lint
+      - name: Run lint
+        id: lint-run
+        run: |
+          set +e
+          OUTPUT=$(task lint 2>&1)
+          EXIT=$?
+          echo "details<<EOF" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          exit $EXIT
 
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-24.04
+    outputs:
+      coverage: ${{ steps.coverage.outputs.pct }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/cache@v5
@@ -54,28 +67,13 @@ jobs:
             END { if (total > 0) printf "%.1f", covered * 100 / total; else print "0.0" }
           ' unit_coverage.out)
           echo "pct=${PCT}%" >> $GITHUB_OUTPUT
-      - name: Find existing coverage comment
-        uses: peter-evans/find-comment@v3
-        id: find-coverage-comment
-        if: always()
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: github-actions[bot]
-          body-includes: <!-- unit-coverage -->
-      - name: Post unit test coverage comment
-        uses: peter-evans/create-or-update-comment@v4
-        if: always()
-        with:
-          comment-id: ${{ steps.find-coverage-comment.outputs.comment-id }}
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            <!-- unit-coverage -->
-            **Unit test coverage: ${{ steps.coverage.outputs.pct }}** (threshold: 95%)
-          edit-mode: replace
 
   test-behavior:
     name: Behavior Tests
     runs-on: ubuntu-24.04
+    outputs:
+      coverage: ${{ steps.coverage.outputs.pct }}
+      diff: ${{ steps.behavior-diff.outputs.diff }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -90,26 +88,74 @@ jobs:
             ${{ runner.os }}-go-
       - uses: jdx/mise-action@v4
       - run: task test:behavior:coverage
+      - name: Extract coverage percentage
+        id: coverage
+        if: always()
+        run: |
+          if [ ! -f coverage.out ]; then
+            echo "pct=N/A" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          PCT=$(LC_ALL=C awk '
+            /^mode:/ { next }
+            /internal\/platform\// { next }
+            /^me\/internal\// { total += $2; if ($3 > 0) covered += $2 }
+            END { if (total > 0) printf "%.1f", covered * 100 / total; else print "0.0" }
+          ' coverage.out)
+          echo "pct=${PCT}%" >> $GITHUB_OUTPUT
       - name: Generate behavior diff
         id: behavior-diff
+        if: always()
         run: |
           DIFF=$(go run ./cmd/behaviordiff/... ${{ github.event.pull_request.base.sha }})
           echo "diff<<EOF" >> $GITHUB_OUTPUT
           echo "$DIFF" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      - name: Find existing behavior diff comment
+
+  comment:
+    name: Post PR Comment
+    needs: [lint, test-unit, test-behavior]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Find existing CI comment
         uses: peter-evans/find-comment@v3
-        id: find-diff-comment
+        id: find-comment
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: github-actions[bot]
-          body-includes: <!-- behavior-diff -->
-      - name: Post behavior diff comment
+          body-includes: <!-- ci-summary -->
+      - name: Post CI summary comment
         uses: peter-evans/create-or-update-comment@v4
         with:
-          comment-id: ${{ steps.find-diff-comment.outputs.comment-id }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            <!-- behavior-diff -->
-            ${{ steps.behavior-diff.outputs.diff }}
           edit-mode: replace
+          body: |
+            <!-- ci-summary -->
+            ## CI Summary
+
+            | Job | Status |
+            |-----|--------|
+            | Lint | ${{ needs.lint.result == 'success' && '✅' || '❌' }} |
+            | Unit Tests | ${{ needs.test-unit.result == 'success' && '✅' || '❌' }} |
+            | Behavior Tests | ${{ needs.test-behavior.result == 'success' && '✅' || '❌' }} |
+
+            **Unit test coverage:** ${{ needs.test-unit.outputs.coverage }} (threshold: 95%)
+            **Behavior test coverage:** ${{ needs.test-behavior.outputs.coverage }} (threshold: 80%)
+
+            <details>
+            <summary>Lint output</summary>
+
+            ```
+            ${{ needs.lint.outputs.details }}
+            ```
+
+            </details>
+
+            <details>
+            <summary>Behavior test changes</summary>
+
+            ${{ needs.test-behavior.outputs.diff }}
+
+            </details>
