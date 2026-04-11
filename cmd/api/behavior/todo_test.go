@@ -189,3 +189,13 @@ func TestBehavior_Todo_Delete_Returns400ForInvalidID(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }
+
+func TestBehavior_Todo_Create_Returns422ForNonExistentUserID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodPost, "/todos", map[string]any{"title": "orphan todo", "user_id": 999999})
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+}

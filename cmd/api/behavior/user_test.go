@@ -206,3 +206,31 @@ func TestBehavior_User_Delete_Returns400ForInvalidID(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }
+
+func TestBehavior_User_Create_Returns409ForDuplicateEmail(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	createUser(t, env, "Original User", "duplicate@example.com")
+
+	w := env.doRequest(http.MethodPost, "/users", map[string]any{
+		"name":  "Duplicate User",
+		"email": "duplicate@example.com",
+	})
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBehavior_User_Delete_Returns409WhenUserHasTodos(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "User With Todos", "userwithTodos@example.com")
+	createTodo(t, env, "blocked todo", user.ID)
+
+	w := env.doRequest(http.MethodDelete, fmt.Sprintf("/users/%d", user.ID), nil)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+}
