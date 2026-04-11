@@ -16,7 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
-	"me/internal/db"
+	"me/internal/platform/db"
 	"me/internal/todos"
 	"me/internal/users"
 )

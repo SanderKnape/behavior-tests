@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
-	"me/internal/db"
+	"me/internal/platform/db"
 	"me/internal/todos"
 	"me/internal/users"
 )

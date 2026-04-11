@@ -26,12 +26,50 @@ tasks:
     cmd: golangci-lint run ./...
 
   test:unit:
-    desc: Run unit tests
-    cmd: go test -cover ./...
+    desc: Run unit tests and generate coverage profile (unit_coverage.out)
+    cmd: go test -coverprofile=unit_coverage.out ./internal/...
+
+  test:unit:coverage:
+    desc: Run unit tests and assert coverage >= 95% across business logic (excludes internal/platform)
+    deps: [test:unit]
+    cmd: >
+      LC_ALL=C awk '
+        /^mode:/ { next }
+        /internal\/platform\// { next }
+        /^me\/internal\// {
+          total += $2
+          if ($3 > 0) covered += $2
+        }
+        END {
+          if (total == 0) { print "no coverage data found"; exit 1 }
+          pct = covered * 100 / total
+          printf "unit test coverage: %.1f%%\n", pct
+          if (pct < 95) { print "FAIL: below 95% threshold"; exit 1 }
+        }
+      ' unit_coverage.out
 
   test:behavior:
-    desc: Run behavior/integration tests (spins up a throwaway postgres via Docker)
+    desc: Run behavior/integration tests and generate coverage profile (coverage.out)
     cmd: go test -tags integration -v -coverpkg=./... -coverprofile=coverage.out ./...
+
+  test:behavior:coverage:
+    desc: Run behavior tests and assert coverage >= 90% across business logic (excludes internal/platform)
+    deps: [test:behavior]
+    cmd: >
+      LC_ALL=C awk '
+        /^mode:/ { next }
+        /internal\/platform\// { next }
+        /^me\/internal\// {
+          total += $2
+          if ($3 > 0) covered += $2
+        }
+        END {
+          if (total == 0) { print "no coverage data found"; exit 1 }
+          pct = covered * 100 / total
+          printf "behavior test coverage: %.1f%%\n", pct
+          if (pct < 90) { print "FAIL: below 90% threshold"; exit 1 }
+        }
+      ' coverage.out
 
   behavior:diff:
     desc: Show which behavior tests changed since last commit
