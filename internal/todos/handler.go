@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -51,6 +52,7 @@ func list(database DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		query := `SELECT id, user_id, title, completed, created_at, updated_at FROM todos`
 		var args []any
+		var conditions []string
 
 		if raw, ok := c.GetQuery("completed"); ok {
 			completed, err := strconv.ParseBool(raw)
@@ -58,8 +60,22 @@ func list(database DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "completed must be true or false"})
 				return
 			}
-			query += ` WHERE completed = $1`
+			conditions = append(conditions, `completed = $`+strconv.Itoa(len(args)+1))
 			args = append(args, completed)
+		}
+
+		if raw, ok := c.GetQuery("user_id"); ok {
+			userID, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "user_id must be a valid integer"})
+				return
+			}
+			conditions = append(conditions, `user_id = $`+strconv.Itoa(len(args)+1))
+			args = append(args, userID)
+		}
+
+		if len(conditions) > 0 {
+			query += ` WHERE ` + strings.Join(conditions, ` AND `)
 		}
 
 		query += ` ORDER BY created_at DESC`
