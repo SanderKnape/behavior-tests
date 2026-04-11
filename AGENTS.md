@@ -38,6 +38,8 @@ Run the narrowest checks that match the change, and mention anything you could n
 - If you changed build wiring, CLI startup, or dependencies: also run `task build`
 - If behavior tests changed through the behavior-test workflow: `task behavior:diff` and `task test:behavior:coverage`
 
+**When introducing new code paths** (new error-handling branches, new conditions, new response codes): add tests for those paths in the same change, before running coverage checks. Coverage checks are a final gate — they should confirm tests pass, not be how you discover that tests are missing.
+
 ## Behavior Tests
 
 Integration tests that verify the observable behavior of the API live in `cmd/api/behavior/`:

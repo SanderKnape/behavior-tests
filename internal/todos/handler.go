@@ -49,8 +49,22 @@ func RegisterRoutes(r *gin.Engine, database DB) {
 
 func list(database DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := database.QueryContext(c.Request.Context(),
-			`SELECT id, user_id, title, completed, created_at, updated_at FROM todos ORDER BY created_at DESC`)
+		query := `SELECT id, user_id, title, completed, created_at, updated_at FROM todos`
+		var args []any
+
+		if raw, ok := c.GetQuery("completed"); ok {
+			completed, err := strconv.ParseBool(raw)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "completed must be true or false"})
+				return
+			}
+			query += ` WHERE completed = $1`
+			args = append(args, completed)
+		}
+
+		query += ` ORDER BY created_at DESC`
+
+		rows, err := database.QueryContext(c.Request.Context(), query, args...)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
