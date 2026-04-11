@@ -57,6 +57,9 @@ env.doRequest(method, path string, body any) *httptest.ResponseRecorder
 // POST /todos, assert 201, and return the decoded todo. Use for test setup.
 createTodo(t *testing.T, env *testEnv, title string, userID int64) todos.Todo
 
+// POST /users, assert 201, and return the decoded user. Use for test setup.
+createUser(t *testing.T, env *testEnv, name, email string) users.User
+
 // Decode the JSON response body into type T.
 decode[T any](w *httptest.ResponseRecorder) T
 ```
@@ -98,6 +101,23 @@ func TestBehavior_Todo_Get_ReturnsMatchingTodo(t *testing.T) {
 }
 ```
 
+## What belongs here vs. in unit tests
+
+Behavior tests and unit tests (in `internal/<domain>/handler_test.go`) complement each other. Write behavior tests for:
+
+- **Happy paths** — successful creates, reads, updates, deletes
+- **404s** — unknown IDs
+- **Validation rejections** — missing required fields (400)
+- **Cross-resource flows** — anything that requires real FK relationships or seeded data
+
+Leave these to unit tests (sqlmock), which can reach them without a real DB:
+
+- **DB error paths** — 500 responses when the database fails
+- **Invalid ID format** — `GET /todos/abc` returning 400 (ParseInt failure)
+- **Partial update correctness** — verifying COALESCE doesn't wipe unset fields
+
+When in doubt: if testing it requires the DB to behave in an unusual way (fail, return corrupt data), it's a unit test. If it's observable from normal API usage, it's a behavior test.
+
 ## Rules
 
 - Only add or update `TestBehavior_*` functions in `cmd/api/behavior_integration_test.go`.
@@ -106,5 +126,5 @@ func TestBehavior_Todo_Get_ReturnsMatchingTodo(t *testing.T) {
 - Do not add table-driven tests. One function per behavior.
 - Keep assertions minimal and direct — test the behavior, not implementation details.
 - Always start with `t.Parallel()` and `env := newTestEnv(t)`.
-- Always use `createTodo` (or similar setup helpers) for setup data — never inline `doRequest` + `decode` without asserting the status code first.
+- Always use `createTodo`/`createUser` (or similar setup helpers) for setup data — never inline `doRequest` + `decode` without asserting the status code first.
 - Never assert exact list counts; the shared DB may contain seeded data alongside test data.
