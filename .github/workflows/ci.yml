@@ -28,7 +28,7 @@ jobs:
         id: lint-run
         run: |
           set +e
-          OUTPUT=$(task lint 2>&1)
+          OUTPUT=$(task lint 2>&1 | sed 's/\x1B\[[0-9;]*[mK]//g')
           EXIT=$?
           echo "details<<EOF" >> $GITHUB_OUTPUT
           echo "$OUTPUT" >> $GITHUB_OUTPUT
@@ -144,18 +144,11 @@ jobs:
             **Unit test coverage:** ${{ needs.test-unit.outputs.coverage }} (threshold: 95%)
             **Behavior test coverage:** ${{ needs.test-behavior.outputs.coverage }} (threshold: 80%)
 
-            <details>
-            <summary>Lint output</summary>
-
+            **Lint output**
             ```
             ${{ needs.lint.outputs.details }}
             ```
 
-            </details>
-
-            <details>
-            <summary>Behavior test changes</summary>
+            **Behavior test changes**
 
             ${{ needs.test-behavior.outputs.diff }}
-
-            </details>
