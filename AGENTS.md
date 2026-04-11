@@ -18,23 +18,24 @@ Run `mise install` to install all tools before working on this project.
 | `task dev`   | Start dev server with live reload (via `air`) |
 | `task run`   | Run the application                |
 | `task build` | Build binary to `bin/app`          |
-| `task test`  | Run tests                          |
 | `task tidy`  | Tidy Go modules                    |
-| `task lint`            | Run Go linting checks (`golangci-lint`)             |
-| `task seed`            | Seed DB with test data                              |
-| `task test:unit`       | Run unit tests                                      |
-| `task test:behavior`   | Run behavior/integration tests (spins up postgres via Docker)|
-| `task up`              | Start full stack in Docker with live rebuild on changes |
-| `task behavior:diff`   | Show which behavior tests changed since last commit |
+| `task lint`                  | Run Go linting checks (`golangci-lint`)                     |
+| `task seed`                  | Seed DB with test data                                      |
+| `task test:unit`             | Run unit tests and generate `unit_coverage.out`             |
+| `task test:unit:coverage`    | Run unit tests and assert coverage ≥ 95%                    |
+| `task test:behavior`         | Run behavior/integration tests (spins up postgres via Docker) and generate `coverage.out` |
+| `task test:behavior:coverage`| Run behavior tests and assert coverage ≥ 80%               |
+| `task up`                    | Start full stack in Docker with live rebuild on changes      |
+| `task behavior:diff`         | Show which behavior tests changed since last commit         |
 
 ## Verification
 
 Run the narrowest checks that match the change, and mention anything you could not run.
 
-- Default for code changes: `task test`
-- If you changed build wiring, CLI startup, or dependencies: `task build` and `task test`
-- If you changed API handlers, database code, migrations, seeds, or integration test helpers: `task test:behavior`
-- If behavior tests changed through the behavior-test workflow: `task behavior:diff` and `task test:behavior`
+- Default for any code change: `task lint` and `task test:unit:coverage`
+- If you changed API handlers, database code, migrations, seeds, or integration test helpers: also run `task test:behavior:coverage`
+- If you changed build wiring, CLI startup, or dependencies: also run `task build`
+- If behavior tests changed through the behavior-test workflow: `task behavior:diff` and `task test:behavior:coverage`
 
 ## Behavior Tests
 
@@ -57,8 +58,8 @@ PostgreSQL 18.x is used locally and in tests. The current repo wiring pins `post
 
 ### Structure
 
-- `internal/db/migrations/` — schema migrations (`000001_create_todos.up.sql` / `.down.sql`). Auto-applied at startup.
-- `internal/db/seeds/001_todos.sql` — test data. Run with `task seed` (idempotent only if table is empty).
+- `internal/platform/db/migrations/` — schema migrations (`000001_create_todos.up.sql` / `.down.sql`). Auto-applied at startup.
+- `internal/platform/db/seeds/001_todos.sql` — test data. Run with `task seed` (idempotent only if table is empty).
 
 ### Local development
 

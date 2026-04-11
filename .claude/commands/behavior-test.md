@@ -113,8 +113,11 @@ Behavior tests and unit tests (in `internal/<domain>/handler_test.go`) complemen
 Leave these to unit tests (sqlmock), which can reach them without a real DB:
 
 - **DB error paths** — 500 responses when the database fails
-- **Invalid ID format** — `GET /todos/abc` returning 400 (ParseInt failure)
 - **Partial update correctness** — verifying COALESCE doesn't wipe unset fields
+
+Both suites cover this (no need to add again if already present in unit tests):
+
+- **Invalid ID format** — `GET /todos/abc` returning 400. Unit tests cover this via sqlmock; behavior tests also cover it to verify the full routing stack handles it correctly.
 
 When in doubt: if testing it requires the DB to behave in an unusual way (fail, return corrupt data), it's a unit test. If it's observable from normal API usage, it's a behavior test.
 

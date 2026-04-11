@@ -161,6 +161,36 @@ func TestBehavior_Todo_Delete_Returns404ForUnknownID(t *testing.T) {
 	}
 }
 
+func TestBehavior_Todo_Get_Returns400ForInvalidID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodGet, "/todos/abc", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestBehavior_Todo_Update_Returns400ForInvalidID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodPut, "/todos/abc", map[string]any{"title": "x"})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestBehavior_Todo_Delete_Returns400ForInvalidID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodDelete, "/todos/abc", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
 func TestBehavior_User_List_ReturnsSeededUsers(t *testing.T) {
 	t.Parallel()
 	env := newTestEnv(t)
@@ -325,5 +355,35 @@ func TestBehavior_User_Delete_Returns404ForUnknownID(t *testing.T) {
 	w := env.doRequest(http.MethodDelete, "/users/999999", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestBehavior_User_Get_Returns400ForInvalidID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodGet, "/users/abc", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestBehavior_User_Update_Returns400ForInvalidID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodPut, "/users/abc", map[string]any{"name": "x"})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestBehavior_User_Delete_Returns400ForInvalidID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodDelete, "/users/abc", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }

@@ -27,7 +27,7 @@ var todoColumns = []string{"id", "user_id", "title", "completed", "created_at", 
 func TestList_Empty(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectQuery(".*").WillReturnRows(sqlmock.NewRows(todoColumns))
 
@@ -42,7 +42,7 @@ func TestList_Empty(t *testing.T) {
 func TestList_ReturnsTodos(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	now := time.Now()
 	rows := sqlmock.NewRows(todoColumns).
@@ -65,7 +65,7 @@ func TestList_ReturnsTodos(t *testing.T) {
 func TestList_DBError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectQuery(".*").WillReturnError(sql.ErrConnDone)
 
@@ -79,7 +79,7 @@ func TestList_DBError(t *testing.T) {
 func TestCreate_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	now := time.Now()
 	mock.ExpectQuery(".*").
@@ -102,7 +102,7 @@ func TestCreate_Success(t *testing.T) {
 func TestCreate_BadRequest(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPost, "/todos", strings.NewReader(`{}`))
@@ -115,7 +115,7 @@ func TestCreate_BadRequest(t *testing.T) {
 func TestCreate_DBError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectQuery(".*").WillReturnError(sql.ErrConnDone)
 
@@ -131,7 +131,7 @@ func TestCreate_DBError(t *testing.T) {
 func TestGet_Found(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	now := time.Now()
 	mock.ExpectQuery(".*").
@@ -151,7 +151,7 @@ func TestGet_Found(t *testing.T) {
 func TestGet_NotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectQuery(".*").WillReturnRows(sqlmock.NewRows(todoColumns))
 
@@ -165,7 +165,7 @@ func TestGet_NotFound(t *testing.T) {
 func TestGet_InvalidID(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/todos/abc", nil)
@@ -177,7 +177,7 @@ func TestGet_InvalidID(t *testing.T) {
 func TestUpdate_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	now := time.Now()
 	title := "Updated title"
@@ -202,7 +202,7 @@ func TestUpdate_Success(t *testing.T) {
 func TestGet_DBError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectQuery(".*").WillReturnError(sql.ErrConnDone)
 
@@ -216,7 +216,7 @@ func TestGet_DBError(t *testing.T) {
 func TestUpdate_InvalidID(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPut, "/todos/abc", strings.NewReader(`{}`))
@@ -229,7 +229,7 @@ func TestUpdate_InvalidID(t *testing.T) {
 func TestUpdate_BadRequest(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPut, "/todos/1", strings.NewReader(`not-json`))
@@ -242,7 +242,7 @@ func TestUpdate_BadRequest(t *testing.T) {
 func TestUpdate_DBError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectQuery(".*").WillReturnError(sql.ErrConnDone)
 
@@ -258,7 +258,7 @@ func TestUpdate_DBError(t *testing.T) {
 func TestUpdate_NotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectQuery(".*").WillReturnRows(sqlmock.NewRows(todoColumns))
 
@@ -274,7 +274,7 @@ func TestUpdate_NotFound(t *testing.T) {
 func TestDelete_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectExec(".*").
 		WithArgs(int64(1)).
@@ -290,7 +290,7 @@ func TestDelete_Success(t *testing.T) {
 func TestDelete_InvalidID(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodDelete, "/todos/abc", nil)
@@ -302,7 +302,7 @@ func TestDelete_InvalidID(t *testing.T) {
 func TestDelete_DBError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectExec(".*").WillReturnError(sql.ErrConnDone)
 
@@ -316,7 +316,7 @@ func TestDelete_DBError(t *testing.T) {
 func TestDelete_NotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	mock.ExpectExec(".*").
 		WithArgs(int64(99)).
