@@ -1,250 +1,94 @@
-# Copilot Instructions — Behavior-Driven Trust Harness
+# Copilot Instructions — Review Behavior, Not Code
 
-This repository is a Go API backed by PostgreSQL. The safety model is simple:
+These instructions are for GitHub Copilot PR reviews in this repository.
 
-- Do not trust implementation details on their own.
-- Trust observable behavior, verified by the test harness.
-- Treat behavior tests as the strongest expression of intended API behavior.
+Start by consulting `AGENTS.md` for the repository's current workflow rules, verification requirements, behavior-test policy, and file-specific constraints. Treat `AGENTS.md` as the source of truth for repo mechanics. Do not invent alternative workflows when that file already defines one.
 
-Your job is to help keep generated code, reviews, and test changes aligned with that model.
+## Review Goal
 
-## Repository Facts To Anchor On
+This repository uses a behavior-driven trust harness so humans can review **behavior** instead of re-reviewing large volumes of implementation.
 
-- Unit tests live under `internal/...`.
-- Behavior tests live under `cmd/api/behavior/...`.
-- Behavior tests act as specifications for user-visible API behavior.
-- Test infrastructure for behavior tests lives in `cmd/api/behavior/testmain_test.go`.
-- Schema migrations live in `internal/platform/db/migrations/`.
-- Seeds live in `internal/platform/db/seeds/`.
-- Tooling is managed with `mise`; task execution is managed with `Taskfile.yml`.
+The intended review model is:
 
-## Core Operating Rules
-
-When generating or reviewing code:
-
-1. Start from behavior, not implementation.
-2. Preserve the intent of existing behavior tests unless the requested change is explicitly behavioral.
-3. Prefer simple code that satisfies the specified behavior over clever abstractions.
-4. Look for signs that code or tests are narrowly shaped to satisfy one case instead of the real requirement.
-
-## Testing Model
-
-### Unit Tests
-
-Use unit tests to validate internal logic, error handling, and cases that benefit from mocking.
-
-Prefer adding unit tests in the matching package, such as:
-
-- `internal/todos/handler_test.go`
-- `internal/users/handler_test.go`
-
-Add unit tests for:
-
-- DB error paths
-- branching business logic
-- validation paths that are easier to isolate with mocks
-
-### Behavior Tests
-
-Behavior tests verify observable API behavior end to end.
-
-Naming convention:
-
-```go
-TestBehavior_<Domain>_<Action>_<Expectation>
+```text
+Review behavior -> trust tests -> avoid implementation-heavy review unless behavior or tests look suspicious
 ```
 
-Examples:
+Your review should help maintain this standard:
 
-```go
-TestBehavior_Todo_List_ReturnsSeededTodos
-TestBehavior_Todo_Create_PersistsAndReturns
-TestBehavior_Todo_Get_Returns404ForUnknownID
-```
+> If CI is green and the behavior looks correct, the PR should be safe to merge.
 
-Behavior tests should describe outcomes a user or client can observe, such as:
+## What To Prioritize In PR Review
 
-- response status
-- response body
-- persistence effects
-- validation failures
+Order your attention like this:
 
-## Hard Rule: Do Not Edit Behavior Test Case Files Directly
+1. Behavior changes
+2. Test quality and trustworthiness
+3. Missing behavior coverage or edge cases
+4. Implementation risks only when behavior or tests suggest a problem
 
-Do not directly modify behavior test case files in `cmd/api/behavior/`, including:
+Do not default to line-by-line implementation commentary when the PR's behavior is clearly specified, behavior changes are intentional, and the tests are trustworthy.
 
-- `cmd/api/behavior/todo_test.go`
-- `cmd/api/behavior/user_test.go`
+## Behavior-First Review
 
-Those files must be updated through the `/behavior-test` skill so naming and structure stay consistent.
+Treat behavior tests as the clearest specification of user-visible behavior.
 
-If a requested change requires behavior-test case updates and that skill is unavailable, stop and say so instead of editing the files manually.
+When reviewing a PR:
 
-You may modify shared behavior-test infrastructure in `cmd/api/behavior/testmain_test.go` when needed.
+- look for new, modified, or removed behavior
+- check whether the changed behavior appears intentional
+- focus on status codes, validation responses, response bodies, persistence effects, and cross-resource behavior
+- call out surprising defaults, silent behavior drift, and inconsistent API semantics
 
-## When Adding Or Changing Functionality
+If behavior tests changed, review the behavior diff before worrying about implementation details.
 
-Use this order of operations:
+## Test Trustworthiness
 
-1. Clarify the intended observable behavior.
-2. Add or update tests for that behavior using the approved workflow.
-3. Add unit tests for internal branches and DB-error paths.
-4. Implement the production change.
-5. Run the narrowest verification that matches the change.
-
-When introducing new code paths, do not rely on coverage gates to reveal missing tests. Add the tests in the same change before running coverage checks.
-
-## Review Checklist
-
-When reviewing code or AI-generated changes, check these areas in order.
-
-### 1. Behavior Correctness
-
-Ask:
-
-- Does the change preserve existing specified behavior?
-- If behavior changed, is the new behavior clearly intentional?
-- Do status codes, validation responses, defaults, and persistence behavior make sense?
-
-Examples of suspicious behavior changes:
-
-- a missing validation error
-- a `404` becoming `200`
-- silent fallback defaults that were not requested
-- updates that do not persist or return stale data
-
-### 2. Test Quality
-
-Prefer tests that verify outcomes, not implementation details.
-
-Good behavior-oriented assertions include:
-
-- response body validation
-- database state validation
-- end-to-end effects across request and persistence layers
+The trust harness only works if the tests are meaningful.
 
 Flag tests that:
 
-- only assert status codes
-- hardcode values in ways that make cheating easy
-- fail to verify persistence or returned payloads
-- only cover the happy path when error branches were added
+- only execute code paths without proving outcomes
+- assert too little to establish real behavior
+- hardcode values in ways that make overfitting easy
+- cover only the happy path when the PR adds new conditions, failure paths, or response modes
 
-Prefer assertions tied to the request input when appropriate:
+Prefer tests that verify observable outcomes such as:
 
-```go
-assert.Equal(t, input.Title, todo.Title)
-```
+- status codes
+- response bodies
+- persistence effects
+- cross-resource constraints
 
-Be cautious when a test overfits to a literal value without proving the real rule:
+Be alert for implementations that appear to satisfy a narrow test case instead of the real rule.
 
-```go
-assert.Equal(t, "Buy milk", todo.Title)
-```
+## When To Inspect Implementation Closely
 
-### 3. Test Gaming And Overfitting
+Inspect implementation details more closely when:
 
-Reject or question implementations that appear shaped only to satisfy the visible test cases.
+- behavior changed without clear specification
+- tests look weak, incomplete, or gameable
+- there are missing negative cases or edge cases
+- the code appears shaped to satisfy fixtures rather than general rules
+- the behavior diff suggests a regression or an unreviewed semantic change
 
-Examples:
+In those cases, implementation review is a follow-up tool for explaining the risk, not the primary review mode.
 
-- hardcoded return values
-- branch logic keyed to a fixture value rather than the rule
-- skipping validation or persistence while still producing the expected response for one case
+## Critical Repo Guardrails
 
-Suspicious example:
+Keep these constraints in mind during review even if other context is noisy:
 
-```go
-return "Buy milk"
-```
+- follow `AGENTS.md` for repo-specific verification and testing expectations
+- behavior test case files in `cmd/api/behavior/` are governed by the `/behavior-test` workflow rather than direct manual edits
+- new observable API behavior should come with behavior-test coverage, and new internal branches or DB-error paths should come with unit coverage where appropriate
 
-### 4. Coverage Intent
+## Review Output
 
-When functionality changes in an observable way, expect both:
+When producing review feedback:
 
-- unit coverage for internal logic and failure branches
-- behavior coverage for externally visible API behavior
+- lead with findings, not summary
+- prioritize behavior regressions, weak tests, missing cases, and suspicious behavior diffs
+- recommend the missing test or behavior coverage when that is the main issue
+- keep implementation-style nits secondary unless they create a real behavior or reliability risk
 
-Common missing cases:
-
-- invalid input
-- not found
-- unauthorized or forbidden access
-- partial update semantics
-- DB failure handling
-
-### 5. Behavior Diff Review
-
-If behavior tests changed, inspect the behavior diff with `task behavior:diff`.
-
-Focus on:
-
-- new behavior
-- modified behavior
-- removed behavior
-
-Confirm the diff matches the requested product change and does not hide regressions.
-
-## Verification Expectations
-
-Run the narrowest checks that match the change and say what you could not run.
-
-Default for any code change:
-
-- `task lint`
-- `task test:unit:coverage`
-
-Also run `task test:behavior:coverage` if you changed:
-
-- API handlers
-- database code
-- migrations
-- seeds
-- behavior-test infrastructure
-
-Also run `task build` if you changed:
-
-- build wiring
-- CLI startup
-- dependencies
-
-If behavior tests changed through the approved skill, also run:
-
-- `task behavior:diff`
-- `task test:behavior:coverage`
-
-## Code Generation Expectations
-
-Generated code should:
-
-- match existing project patterns
-- stay readable and direct
-- avoid unnecessary abstraction
-- implement the requested behavior fully, not minimally
-- align with the tests' intent rather than exploiting their gaps
-
-## Review Output Preference
-
-When asked to review, prioritize findings over summary.
-
-Order review feedback by:
-
-1. behavior correctness
-2. test quality
-3. missing edge cases
-4. implementation quality
-
-If tests are missing, say which ones are needed:
-
-- success case
-- failure case
-- edge case
-- authorization case
-
-## Final Goal
-
-The goal is to keep this statement true:
-
-> If CI is green and the behavior looks correct, the change is safe to merge.
-
-Optimize your suggestions, code generation, and review comments for that standard.
+The point of this file is not to restate the entire repo handbook. It is to keep Copilot's PR review behavior aligned with the repository's trust model: humans review behavior, CI enforces constraints, and implementation detail only becomes the focus when the harness gives a reason to distrust the change.
