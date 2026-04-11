@@ -9,7 +9,7 @@
 - `air` — Live reload for development
 - `golangci-lint` — Go linting used by `task lint`
 
-Run `mise install` to install all tools before working on this project.
+Run `mise install` to install all required tools before working on this project, including `golangci-lint` for the default `task lint` verification step.
 
 ### Taskfile
 [Task](https://taskfile.dev/) is used as the task runner (`Taskfile.yml`). Common tasks:
@@ -39,6 +39,9 @@ Run the narrowest checks that match the change, and mention anything you could n
 - If behavior tests changed through the behavior-test workflow: `task behavior:diff` and `task test:behavior:coverage`
 
 **When introducing new code paths** (new error-handling branches, new conditions, new response codes): add tests for those paths in the same change, before running coverage checks. Coverage checks are a final gate — they should confirm tests pass, not be how you discover that tests are missing.
+
+- Add unit tests (in `internal/<domain>/handler_test.go`) for DB-error paths and other cases that require mocking.
+- Add behavior tests via the `/behavior-test` workflow for any new observable API behavior (new query parameters, new success/error responses, new endpoints). Run this workflow as part of the same change so both coverage gates pass together.
 
 ## Behavior Tests
 
