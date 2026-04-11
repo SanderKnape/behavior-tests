@@ -43,6 +43,8 @@ Run the narrowest checks that match the change, and mention anything you could n
 - Add unit tests (in `internal/<domain>/handler_test.go`) for DB-error paths and other cases that require mocking.
 - Add or update behavior tests via the `/behavior-test` skill for any new or changed observable API behavior (new query parameters, new success/error responses, new endpoints, or intentional behavior changes). Run this skill as part of the same change so both coverage gates pass together.
 
+After all checks pass, run `/review` on the changed files before considering the task done. This catches issues that coverage checks won't — such as loose test assertions, missing mock expectations, non-deterministic ordering, or logic correctness problems.
+
 ## Behavior Tests
 
 Integration tests that verify the observable behavior of the API live in `cmd/api/behavior/`:

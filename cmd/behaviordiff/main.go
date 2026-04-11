@@ -172,7 +172,7 @@ func parseDirAtRef(ref string) map[string]string {
 		if name == "" || !strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		src, err := gitShow(ref, behaviorDir+"/"+name)
+		src, err := gitShow(ref, name)
 		if err != nil {
 			continue
 		}
