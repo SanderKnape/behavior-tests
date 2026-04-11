@@ -32,35 +32,7 @@ tasks:
   test:unit:coverage:
     desc: Run unit tests and assert coverage >= 85% across all internal packages
     deps: [test:unit]
-    cmd: |
-      echo "Package coverage:"
-      LC_ALL=C awk '
-        /^mode:/ { next }
-        /^me\/internal\// {
-          split($1, a, ":")
-          n = split(a[1], p, "/")
-          pkg = p[2]; for (i = 3; i < n; i++) pkg = pkg "/" p[i]
-          total[pkg] += $2
-          if ($3 > 0) covered[pkg] += $2
-        }
-        END {
-          for (pkg in total) {
-            pct = total[pkg] > 0 ? covered[pkg] * 100 / total[pkg] : 0
-            printf "%s %.1f\n", pkg, pct
-          }
-        }
-      ' unit_coverage.out | sort | LC_ALL=C awk '{printf "  %-44s %5.1f%%\n", $1, $2}'
-      echo ""
-      LC_ALL=C awk '
-        /^mode:/ { next }
-        /^me\/internal\// { total += $2; if ($3 > 0) covered += $2 }
-        END {
-          if (total == 0) { print "no coverage data found"; exit 1 }
-          pct = covered * 100 / total
-          printf "unit test coverage: %.1f%%\n", pct
-          if (pct < 85) { print "FAIL: below 85% threshold"; exit 1 }
-        }
-      ' unit_coverage.out
+    cmd: go run ./cmd/coverreport/ -threshold 85 -label "unit test" unit_coverage.out
 
   test:behavior:
     desc: Run behavior/integration tests and generate coverage profile (coverage.out)
@@ -69,40 +41,7 @@ tasks:
   test:behavior:coverage:
     desc: Run behavior tests and assert coverage >= 80% across business logic (excludes internal/platform)
     deps: [test:behavior]
-    cmd: |
-      echo "Package coverage:"
-      LC_ALL=C awk '
-        /^mode:/ { next }
-        /^me\/internal\// {
-          split($1, a, ":")
-          n = split(a[1], p, "/")
-          pkg = p[2]; for (i = 3; i < n; i++) pkg = pkg "/" p[i]
-          total[pkg] += $2
-          if ($3 > 0) covered[pkg] += $2
-        }
-        END {
-          for (pkg in total) {
-            pct = total[pkg] > 0 ? covered[pkg] * 100 / total[pkg] : 0
-            platform = (index(pkg, "platform") > 0) ? " *" : ""
-            printf "%s %.1f%s\n", pkg, pct, platform
-          }
-        }
-      ' coverage.out | sort | LC_ALL=C awk '{
-        note = ($3 == "*") ? " (excluded from threshold)" : ""
-        printf "  %-44s %5.1f%%%s\n", $1, $2, note
-      }'
-      echo ""
-      LC_ALL=C awk '
-        /^mode:/ { next }
-        /internal\/platform\// { next }
-        /^me\/internal\// { total += $2; if ($3 > 0) covered += $2 }
-        END {
-          if (total == 0) { print "no coverage data found"; exit 1 }
-          pct = covered * 100 / total
-          printf "behavior test coverage: %.1f%%\n", pct
-          if (pct < 80) { print "FAIL: below 80% threshold"; exit 1 }
-        }
-      ' coverage.out
+    cmd: go run ./cmd/coverreport/ -threshold 80 -filter internal/ -exclude internal/platform -label "behavior test" coverage.out
 
   behavior:diff:
     desc: Show which behavior tests changed since last commit
