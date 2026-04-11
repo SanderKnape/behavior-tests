@@ -189,3 +189,67 @@ func TestBehavior_Todo_Delete_Returns400ForInvalidID(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }
+
+func TestBehavior_Todo_Create_Returns422ForNonExistentUserID(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodPost, "/todos", map[string]any{"title": "orphan todo", "user_id": 999999})
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBehavior_Todo_List_FilterByCompleted_ReturnsOnlyCompletedTodos(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	created := createTodo(t, env, "complete me", 1)
+	env.doRequest(http.MethodPut, fmt.Sprintf("/todos/%d", created.ID), map[string]any{"completed": true})
+
+	createTodo(t, env, "leave me incomplete", 1)
+
+	w := env.doRequest(http.MethodGet, "/todos?completed=true", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	for _, todo := range result {
+		if !todo.Completed {
+			t.Fatalf("expected only completed todos, got todo %d with completed=false", todo.ID)
+		}
+	}
+}
+
+func TestBehavior_Todo_List_FilterByCompleted_ReturnsOnlyIncompleteTodos(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	created := createTodo(t, env, "complete me", 1)
+	env.doRequest(http.MethodPut, fmt.Sprintf("/todos/%d", created.ID), map[string]any{"completed": true})
+
+	createTodo(t, env, "leave me incomplete", 1)
+
+	w := env.doRequest(http.MethodGet, "/todos?completed=false", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	for _, todo := range result {
+		if todo.Completed {
+			t.Fatalf("expected only incomplete todos, got todo %d with completed=true", todo.ID)
+		}
+	}
+}
+
+func TestBehavior_Todo_List_FilterByCompleted_Returns400ForInvalidValue(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodGet, "/todos?completed=maybe", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

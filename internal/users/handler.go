@@ -3,11 +3,13 @@ package users
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // DB is the subset of *sql.DB and *sql.Tx used by handlers.
@@ -86,6 +88,11 @@ func create(database DB) gin.HandlerFunc {
 			req.Name, req.Email,
 		).Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt, &u.UpdatedAt)
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				c.JSON(http.StatusConflict, gin.H{"error": "email already in use"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
@@ -162,6 +169,11 @@ func delete(database DB) gin.HandlerFunc {
 		result, err := database.ExecContext(c.Request.Context(),
 			`DELETE FROM users WHERE id = $1`, id)
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				c.JSON(http.StatusConflict, gin.H{"error": "cannot delete user with existing todos"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}

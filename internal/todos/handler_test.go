@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,40 @@ func TestList_ReturnsTodos(t *testing.T) {
 	assert.Len(t, result, 2)
 	assert.Equal(t, "Buy milk", result[0].Title)
 	assert.Equal(t, "Walk dog", result[1].Title)
+}
+
+func TestList_FilterCompleted(t *testing.T) {
+	for _, completed := range []bool{true, false} {
+		db, mock, err := sqlmock.New()
+		require.NoError(t, err)
+		defer db.Close() //nolint:errcheck
+
+		now := time.Now()
+		rows := sqlmock.NewRows(todoColumns).AddRow(1, 10, "Buy milk", completed, now, now)
+		mock.ExpectQuery(".*").WithArgs(completed).WillReturnRows(rows)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/todos?completed="+strconv.FormatBool(completed), nil)
+		todoRouter(db).ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var result []Todo
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+		assert.Len(t, result, 1)
+		assert.Equal(t, completed, result[0].Completed)
+	}
+}
+
+func TestList_FilterCompleted_InvalidValue(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?completed=maybe", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestList_DBError(t *testing.T) {
@@ -308,6 +343,25 @@ func TestDelete_DBError(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodDelete, "/todos/1", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestList_RowsError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	mock.ExpectQuery(".*").WillReturnRows(
+		sqlmock.NewRows(todoColumns).
+			AddRow(1, 10, "title", false, now, now).
+			RowError(0, sql.ErrConnDone),
+	)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos", nil)
 	todoRouter(db).ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)

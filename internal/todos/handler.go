@@ -3,11 +3,13 @@ package todos
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // DB is the subset of *sql.DB and *sql.Tx used by handlers.
@@ -47,8 +49,22 @@ func RegisterRoutes(r *gin.Engine, database DB) {
 
 func list(database DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := database.QueryContext(c.Request.Context(),
-			`SELECT id, user_id, title, completed, created_at, updated_at FROM todos ORDER BY created_at DESC`)
+		query := `SELECT id, user_id, title, completed, created_at, updated_at FROM todos`
+		var args []any
+
+		if raw, ok := c.GetQuery("completed"); ok {
+			completed, err := strconv.ParseBool(raw)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "completed must be true or false"})
+				return
+			}
+			query += ` WHERE completed = $1`
+			args = append(args, completed)
+		}
+
+		query += ` ORDER BY created_at DESC`
+
+		rows, err := database.QueryContext(c.Request.Context(), query, args...)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
@@ -88,6 +104,11 @@ func create(database DB) gin.HandlerFunc {
 			req.UserID, req.Title,
 		).Scan(&t.ID, &t.UserID, &t.Title, &t.Completed, &t.CreatedAt, &t.UpdatedAt)
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "referenced user does not exist"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}

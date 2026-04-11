@@ -313,6 +313,25 @@ func TestDelete_DBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
+func TestList_RowsError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	mock.ExpectQuery(".*").WillReturnRows(
+		sqlmock.NewRows(userColumns).
+			AddRow(1, "Alice", "alice@example.com", now, now).
+			RowError(0, sql.ErrConnDone),
+	)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/users", nil)
+	userRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
 func TestDelete_NotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
