@@ -1,0 +1,5 @@
+[tools]
+go = "1.26"
+task = "latest"
+air = "latest"
+golangci-lint = "latest"

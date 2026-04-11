@@ -1,0 +1,41 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Start development server with live reload
+    cmd: air
+
+  run:
+    desc: Run the application
+    cmd: go run ./cmd/api/
+
+  build:
+    desc: Build the application
+    cmd: go build -o bin/app ./cmd/api/
+
+  tidy:
+    desc: Tidy go modules
+    cmd: go mod tidy
+
+  seed:
+    desc: Seed the database with test data
+    cmd: go run ./cmd/api/ -seed
+
+  lint:
+    desc: Run Go linting checks
+    cmd: golangci-lint run ./...
+
+  test:unit:
+    desc: Run unit tests
+    cmd: go test -cover ./...
+
+  test:behavior:
+    desc: Run behavior/integration tests (spins up a throwaway postgres via Docker)
+    cmd: go test -tags integration -v -coverpkg=./... -coverprofile=coverage.out ./...
+
+  behavior:diff:
+    desc: Show which behavior tests changed since last commit
+    cmd: go run ./cmd/behaviordiff/...
+
+  up:
+    cmd: docker compose up --watch --build --pull missing

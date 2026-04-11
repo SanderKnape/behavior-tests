@@ -1,0 +1,9 @@
+.env
+tmp/
+bin/
+coverage.out
+coverage.html
+.DS_Store
+/api
+/behaviordiff
+/me

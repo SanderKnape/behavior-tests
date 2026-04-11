@@ -1,0 +1,38 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/todos?sslmode=disable
+      GIN_MODE: release
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - path: .
+          action: rebuild
+          ignore:
+            - tmp/
+            - bin/
+            - .env
+
+  db:
+    image: postgres:18.3
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: todos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
