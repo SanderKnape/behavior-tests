@@ -46,6 +46,18 @@ If a PR adds or changes observable API behavior and there is no corresponding be
 
 Infer expected behavior-test coverage from the user-visible surface of the change, not only from the tests already present.
 
+Strong signals that behavior-test coverage may need to change include:
+
+- new endpoints
+- new query parameters
+- new success or error response modes
+- new validation behavior
+- changed not-found, conflict, or authorization behavior
+
+When a PR changes observable API behavior without a corresponding behavior-test update, that should usually be the primary finding unless a more severe correctness issue exists.
+
+Treat missing behavior-test coverage for a user-visible change as a missing specification problem, not just a generic testing gap.
+
 ## Test Trustworthiness
 
 The trust harness only works if the tests are meaningful.
@@ -79,6 +91,8 @@ Inspect implementation details more closely when:
 
 In those cases, implementation review is a follow-up tool for explaining the risk, not the primary review mode.
 
+Do not spend review effort on speculative implementation concerns unless you can connect them to a concrete behavior risk, regression risk, or test-trust issue.
+
 ## Critical Repo Guardrails
 
 Keep these constraints in mind during review even if other context is noisy:
@@ -92,6 +106,7 @@ Keep these constraints in mind during review even if other context is noisy:
 When producing review feedback:
 
 - lead with findings, not summary
+- for behavior-related PRs, prefer this order: missing or changed observable behavior, missing behavior-test/spec coverage, weak or gameable tests, then implementation risks tied to those issues
 - prioritize behavior regressions, weak tests, missing cases, and suspicious behavior diffs
 - recommend the missing test or behavior coverage when that is the main issue
 - keep implementation-style nits secondary unless they create a real behavior or reliability risk
