@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -124,6 +125,29 @@ func TestList_FilterCompletedAndUserID(t *testing.T) {
 	assert.Len(t, result, 1)
 	assert.True(t, result[0].Completed)
 	assert.Equal(t, int64(42), result[0].UserID)
+}
+
+func TestList_FilterSearch(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	rows := sqlmock.NewRows(todoColumns).AddRow(1, 10, "Buy milk", false, now, now)
+	mock.ExpectQuery(regexp.QuoteMeta(
+		`SELECT id, user_id, title, completed, created_at, updated_at FROM todos WHERE title ILIKE $1 ORDER BY created_at DESC, id DESC`,
+	)).WithArgs("%milk%").WillReturnRows(rows)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/todos?search=milk", nil)
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []Todo
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 1)
+	assert.Equal(t, "Buy milk", result[0].Title)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestList_Pagination_Limit(t *testing.T) {
@@ -522,4 +546,145 @@ func TestDelete_NotFound(t *testing.T) {
 	todoRouter(db).ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestBulkComplete_Success(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	mock.ExpectQuery("UPDATE todos").
+		WithArgs(int64(1), int64(2)).
+		WillReturnRows(sqlmock.NewRows(todoColumns).
+			AddRow(1, 10, "Buy milk", true, now, now).
+			AddRow(2, 10, "Walk dog", true, now, now))
+
+	body := `{"ids": [1, 2]}`
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var result []Todo
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	assert.Len(t, result, 2)
+	assert.True(t, result[0].Completed)
+	assert.True(t, result[1].Completed)
+}
+
+func TestBulkComplete_EmptyIDs(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	body := `{"ids": []}`
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.JSONEq(t, "[]", w.Body.String())
+}
+
+func TestBulkComplete_TooManyIDs(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	ids := make([]int64, maxBulkIDs+1)
+	for i := range ids {
+		ids[i] = int64(i + 1)
+	}
+	bodyBytes, _ := json.Marshal(map[string]any{"ids": ids})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(string(bodyBytes)))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestBulkComplete_InvalidBody(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(`not-json`))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestBulkComplete_MissingIDs(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(`{"ids": null}`))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestBulkComplete_DBError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	mock.ExpectQuery("UPDATE todos").WillReturnError(sql.ErrConnDone)
+
+	body := `{"ids": [1, 2]}`
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestBulkComplete_NoneMatch(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	mock.ExpectQuery("UPDATE todos").
+		WithArgs(int64(999)).
+		WillReturnRows(sqlmock.NewRows(todoColumns))
+
+	body := `{"ids": [999]}`
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.JSONEq(t, "[]", w.Body.String())
+}
+
+func TestBulkComplete_RowsError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close() //nolint:errcheck
+
+	now := time.Now()
+	mock.ExpectQuery("UPDATE todos").WillReturnRows(
+		sqlmock.NewRows(todoColumns).
+			AddRow(1, 10, "title", true, now, now).
+			RowError(0, sql.ErrConnDone),
+	)
+
+	body := `{"ids": [1]}`
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/todos/bulk-complete", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	todoRouter(db).ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
