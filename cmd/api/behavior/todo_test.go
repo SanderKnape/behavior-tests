@@ -425,3 +425,127 @@ func TestBehavior_Todo_List_InvalidOffsetReturnsBadRequest(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestBehavior_Todo_List_SearchReturnsMatchingTodos(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Search User", "search-user@example.com")
+	match := createTodo(t, env, "Buy milk", user.ID)
+	createTodo(t, env, "Walk dog", user.ID)
+
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?user_id=%d&search=milk", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 matching todo, got %d", len(result))
+	}
+	if result[0].ID != match.ID {
+		t.Fatalf("expected todo ID %d, got %d", match.ID, result[0].ID)
+	}
+}
+
+func TestBehavior_Todo_List_SearchReturnsEmptyWhenNoMatch(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Search Empty User", "search-empty@example.com")
+	createTodo(t, env, "Buy milk", user.ID)
+
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?user_id=%d&search=xyz_no_match", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 0 {
+		t.Fatalf("expected 0 todos, got %d", len(result))
+	}
+}
+
+func TestBehavior_Todo_List_SearchIsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	user := createUser(t, env, "Search Case User", "search-case@example.com")
+	match := createTodo(t, env, "Buy milk", user.ID)
+
+	w := env.doRequest(http.MethodGet, fmt.Sprintf("/todos?user_id=%d&search=MILK", user.ID), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 todo for case-insensitive search, got %d", len(result))
+	}
+	if result[0].ID != match.ID {
+		t.Fatalf("expected todo ID %d, got %d", match.ID, result[0].ID)
+	}
+}
+
+func TestBehavior_Todo_BulkComplete_MarksAsCompleted(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	a := createTodo(t, env, "bulk one", 1)
+	b := createTodo(t, env, "bulk two", 1)
+
+	w := env.doRequest(http.MethodPost, "/todos/bulk-complete", map[string]any{"ids": []int64{a.ID, b.ID}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 updated todos, got %d", len(result))
+	}
+	for _, todo := range result {
+		if !todo.Completed {
+			t.Fatalf("expected todo %d to be completed, got completed=false", todo.ID)
+		}
+	}
+}
+
+func TestBehavior_Todo_BulkComplete_EmptyIDs_ReturnsEmptyArray(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodPost, "/todos/bulk-complete", map[string]any{"ids": []int64{}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 0 {
+		t.Fatalf("expected empty array, got %d todos", len(result))
+	}
+}
+
+func TestBehavior_Todo_BulkComplete_UnknownIDs_ReturnsEmptyArray(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodPost, "/todos/bulk-complete", map[string]any{"ids": []int64{999999, 999998}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	result := decode[[]todos.Todo](w)
+	if len(result) != 0 {
+		t.Fatalf("expected empty array for unknown IDs, got %d todos", len(result))
+	}
+}
+
+func TestBehavior_Todo_BulkComplete_MissingBody_Returns400(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+
+	w := env.doRequest(http.MethodPost, "/todos/bulk-complete", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

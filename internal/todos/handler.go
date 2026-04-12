@@ -39,10 +39,17 @@ type updateRequest struct {
 	Completed *bool   `json:"completed"`
 }
 
+type bulkCompleteRequest struct {
+	IDs []int64 `json:"ids"`
+}
+
+const maxBulkIDs = 100
+
 func RegisterRoutes(r *gin.Engine, database DB) {
 	g := r.Group("/todos")
 	g.GET("", list(database))
 	g.POST("", create(database))
+	g.POST("/bulk-complete", bulkComplete(database))
 	g.GET("/:id", get(database))
 	g.PUT("/:id", update(database))
 	g.DELETE("/:id", delete(database))
@@ -72,6 +79,11 @@ func list(database DB) gin.HandlerFunc {
 			}
 			conditions = append(conditions, `user_id = $`+strconv.Itoa(len(args)+1))
 			args = append(args, userID)
+		}
+
+		if raw, ok := c.GetQuery("search"); ok {
+			conditions = append(conditions, `title ILIKE $`+strconv.Itoa(len(args)+1))
+			args = append(args, "%"+raw+"%")
 		}
 
 		if len(conditions) > 0 {
@@ -212,6 +224,61 @@ func update(database DB) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, t)
+	}
+}
+
+func bulkComplete(database DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req bulkCompleteRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if req.IDs == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ids is required"})
+			return
+		}
+		if len(req.IDs) == 0 {
+			c.JSON(http.StatusOK, []Todo{})
+			return
+		}
+		if len(req.IDs) > maxBulkIDs {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "too many ids"})
+			return
+		}
+
+		placeholders := make([]string, len(req.IDs))
+		args := make([]any, len(req.IDs))
+		for i, id := range req.IDs {
+			placeholders[i] = "$" + strconv.Itoa(i+1)
+			args[i] = id
+		}
+		query := `UPDATE todos SET completed = true, updated_at = NOW() WHERE id IN (` +
+			strings.Join(placeholders, ", ") +
+			`) RETURNING id, user_id, title, completed, created_at, updated_at`
+
+		rows, err := database.QueryContext(c.Request.Context(), query, args...)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
+		}
+		defer func() { _ = rows.Close() }()
+
+		result := []Todo{}
+		for rows.Next() {
+			var t Todo
+			if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Completed, &t.CreatedAt, &t.UpdatedAt); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+				return
+			}
+			result = append(result, t)
+		}
+		if err := rows.Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
+		}
+
+		c.JSON(http.StatusOK, result)
 	}
 }
 
