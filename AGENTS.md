@@ -33,17 +33,17 @@ Run `mise install` to install all required tools before working on this project,
 
 Run the narrowest checks that match the change, and mention anything you could not run.
 
-- Default for any code change: `task lint` and `task test:unit:coverage`
+- Default for any code change: `task lint`, `semgrep scan --config=auto`, and `task test:unit:coverage`
 - If you changed API handlers, database code, migrations, seeds, or integration test helpers: also run `task test:behavior:coverage`
 - If you changed build wiring, CLI startup, or dependencies: also run `task build`
 - If behavior tests changed through the behavior-test skill: `task behavior:diff` and `task test:behavior:coverage`
 
 **When introducing new code paths** (new error-handling branches, new conditions, new response codes): add tests for those paths in the same change, before running coverage checks. Coverage checks are a final gate — they should confirm tests pass, not be how you discover that tests are missing.
 
-- Add unit tests (in `internal/<domain>/handler_test.go`) for DB-error paths and other cases that require mocking.
-- Add or update behavior tests via the `/behavior-test` skill for any new or changed observable API behavior (new query parameters, new success/error responses, new endpoints, or intentional behavior changes). Run this skill as part of the same change so both coverage gates pass together.
+- Add unit tests (in `internal/<domain>/handler_test.go`) for DB-error paths and other cases that require mocking. Write these before implementing.
+- Add or update behavior tests via the `/behavior-test` skill for any new or changed observable API behavior (new query parameters, new success/error responses, new endpoints, or intentional behavior changes). Invoke this skill before implementing — alongside unit tests — so both test suites define the intended contract before code changes.
 
-After all checks pass, run `/review` on the changed files before considering the task done. This catches issues that coverage checks won't — such as loose test assertions, missing mock expectations, non-deterministic ordering, or logic correctness problems.
+After all checks pass, run `/simplify` on the changed files before considering the task done. This catches issues that coverage checks won't — such as loose test assertions, missing mock expectations, non-deterministic ordering, or logic correctness problems.
 
 ## Behavior Tests
 

@@ -9,6 +9,12 @@ Use this skill when the user wants to add, update, or review behavior tests for 
 
 This repository treats behavior tests as the specification for observable API behavior, but behavior test case files must be updated through this `/behavior-test` skill.
 
+## Your role
+
+**If you are executing as the `/behavior-test` skill:** you are the approved workflow. Edit the behavior test case files directly — that is the purpose of this skill. The restrictions below about not editing those files apply to Claude running outside this skill context.
+
+**If you are Claude reading this skill description to decide whether to invoke it:** do not edit behavior test case files directly. Invoke `/behavior-test` instead.
+
 ## Your job
 
 For each request:
@@ -16,8 +22,8 @@ For each request:
 1. Determine the observable behavior that needs coverage.
 2. Inspect the relevant implementation and existing tests.
 3. Decide whether the request belongs in behavior tests, unit tests, or both.
-4. Route behavior test case changes through `/behavior-test` instead of editing case files directly.
-5. If `/behavior-test` is unavailable in the current runtime, stop and tell the user clearly.
+4. Write the behavior tests directly into the case files.
+5. If you are not executing as this skill, stop — behavior test case files must be updated through `/behavior-test`.
 
 ## What You May And May Not Edit
 
@@ -148,15 +154,14 @@ Choose one of these outcomes:
 
 If the request is really about DB failures or mocked branches, say that it belongs in unit tests instead of behavior tests.
 
-### 5. Use The Approved Behavior-Test Path
+### 5. Write The Tests
 
-If behavior test case changes are needed:
+Edit the behavior test case files directly:
 
-- use the `/behavior-test` workflow
-- do not directly edit `cmd/api/behavior/todo_test.go`
-- do not directly edit `cmd/api/behavior/user_test.go`
+- `cmd/api/behavior/todo_test.go` for todo-related behavior
+- `cmd/api/behavior/user_test.go` for user-related behavior
 
-If `/behavior-test` is unavailable, stop and tell the user that behavior test case files cannot be updated manually in this repo.
+You are executing as the approved workflow — direct edits are the correct action here.
 
 ## Output Shape
 
